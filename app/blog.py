@@ -1,8 +1,9 @@
 from flask import Blueprint, send_from_directory, abort
 from flask_login import login_required, current_user
-import os
-import yaml
+import os, yaml
 from app.models import User, Class, enrolled_classes
+from app import db, logger
+
 
 blog = Blueprint('blog', __name__, url_prefix='/zuoye/blog')
 STATIC_BLOG_DIR = '/app/static-blog'
@@ -20,10 +21,9 @@ def get_courses():
                 'id': c['id'],
                 'title': c['title'],
                 'description': c['description'],
-                'order': c.get('order', 999),
-                'class_id': c.get('class_id')
-            })
-        return sorted(courses, key=lambda x: x['order'])
+                'class_id': c.get('class_id', 999),
+             })
+        return sorted(courses, key=lambda x: x['class_id'])
 
 def user_can_access_course(course_id):
     course = next((c for c in get_courses() if c['id'] == course_id), None)

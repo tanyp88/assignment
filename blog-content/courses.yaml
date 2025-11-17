@@ -1,0 +1,25 @@
+courses:
+  - id: "1"
+    title: "结构程序设计-专硕"
+    description: "2025秋季 · 谭也平副教授"
+    class_id: 1
+
+  - id: "2"
+    title: "结构程序设计-学硕"
+    description: "2025秋季 · 谭也平副教授"
+    class_id: 2
+
+  - id: "3"
+    title: "数据结构与算法"
+    description: "2025秋季 · 谭也平副教授"
+    class_id: 3
+
+  - id: "4"
+    title: "桥梁施工与监控"
+    description: "2025秋季 · 谭也平副教授"
+    class_id: 4
+
+  - id: "5"
+    title: "桥梁概论"
+    description: "2025秋季 · 谭也平 教授"
+    class_id: 5

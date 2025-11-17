@@ -165,6 +165,9 @@ def create_app():
     from app.project import project_bp as final_project_blueprint
     app.register_blueprint(final_project_blueprint, url_prefix='/zuoye/final_project')
 
+    from app.api import api 
+    app.register_blueprint(api, url_prefix='/zuoye/api')
+
     app.config['WTF_CSRF_EXEMPT_ROUTES'] = [
         # Exemption for the student check-in API route
         '/zuoye/attendance/checkin', 

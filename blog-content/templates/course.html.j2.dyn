@@ -1,0 +1,189 @@
+{# /app/blog-content/templates/course.html.j2 #}
+{% extends "static_base.html.j2" %}
+
+{% block title %}{{ course.title }} - 谭也平{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <a href="/zuoye/blog/" class="btn btn-outline-light mb-4">返回首页</a>
+    <h1 class="display-5">{{ course.title }}</h1>
+    <p class="lead">{{ course.description }}</p>
+
+    <!-- 公告区 -->
+    <h2 class="mt-5 d-flex justify-content-between align-items-center">
+        课程公告 <small class="text-muted">(实时)</small>
+        <span id="teacher-controls"></span>
+    </h2>
+    <div id="announcements">加载中...</div>
+
+    <!-- 私信区 -->
+    <div id="messages-section"></div>
+
+    <!-- 课件区 -->
+    <h2 class="mt-5">课件 <small class="text-muted">(实时)</small></h2>
+    <div id="presentations">加载中...</div>
+</div>
+
+<style>
+    :root {
+        --bg: #0D1117;
+        --card: #161B22;
+        --text: #C9D1D9;
+        --accent: #00BCD4;
+        --danger: #DC3545;
+    }
+    body { background: var(--bg); color: var(--text); }
+    .announcement { background: var(--card); border-left: 4px solid var(--accent); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+    .private-msg { background: #1F2531; border-left: 5px solid #6c757d; border-radius: 10px; padding: 16px; margin-bottom: 12px; }
+    .msg-teacher { border-left-color: var(--danger); background: #2a1a1f; }
+    .card.bg-secondary { background: var(--card) !important; border: 1px solid #30363D; }
+    .form-control, .form-control:focus { background: #2D333B; border-color: #444; color: #fff; }
+    .btn-play { background: var(--accent); color: black; }
+    .btn-pdf { background: var(--danger); }
+</style>
+
+<script>
+// === 完全独立 JS · 不依赖 static_base · 谭也平专属终极版 ===
+
+const classId = location.pathname.match(/course\/(\d+)\.html/)?.[1] || "1";
+
+async function fetchCsrfToken() {
+    try {
+        const response = await fetch('/api/get-csrf-token');
+        const data = await response.json();
+        return data.csrf_token;
+    } catch (error) {
+        console.error("Failed to fetch CSRF token:", error);
+        return null;
+    }
+}
+
+// 加载公告
+function loadAnnouncements() {
+    fetch(`/zuoye/api/announcements/${classId}`)
+        .then(r => r.json())
+        .then(data => {
+            const el = document.getElementById('announcements');
+            if (!data?.length) return el.innerHTML = '<p class="text-muted">暂无公告</p>';
+            el.innerHTML = data.map(a => `
+                <div class="announcement">
+                    <h5>${a.title || '公告'}</h5>
+                    <small class="text-muted">${a.date}</small>
+                    <div class="mt-2">${a.content}</div>
+                </div>
+            `).join('');
+        });
+}
+
+// 加载课件
+function loadPresentations() {
+    fetch(`/zuoye/api/presentations/${classId}`)
+        .then(r => r.json())
+        .then(files => {
+            const el = document.getElementById('presentations');
+            if (!files?.length) return el.innerHTML = '<p class="text-muted">暂无课件</p>';
+            el.innerHTML = `<div class="row row-cols-1 row-cols-md-3 g-4">
+                ${files.map(f => `
+                <div class="col">
+                    <div class="card bg-secondary text-white h-100">
+                        <div class="card-body d-flex flex-column">
+                            <h6 class="card-title text-truncate">${f.name}</h6>
+                            <a href="${f.url}" class="btn btn-sm mt-auto ${f.is_html ? 'btn-play' : 'btn-pdf'}"
+                               target="_blank" ${f.is_html ? '' : 'download'}>
+                                ${f.is_html ? '在线播放' : '下载'}
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                `).join('')}
+            </div>`;
+        });
+}
+
+// 加载私信
+function loadMessages(isTeacher = false) {
+    fetch(`/zuoye/api/messages/${classId}`)
+        .then(r => r.json())
+        .then(msgs => {
+            let section = document.getElementById('messages-section');
+            if (!section.innerHTML) {
+                section.innerHTML = `<h2 class="mt-5">学生私信 <small class="text-muted">${isTeacher ? '(全部)' : '(仅自己)'}</small></h2><div id="msg-list"></div>`;
+            }
+            const list = document.getElementById('msg-list');
+            if (!msgs?.length) return list.innerHTML = '<p class="text-muted">暂无私信</p>';
+            list.innerHTML = msgs.map(m => `
+                <div class="private-msg ${m.is_teacher ? 'msg-teacher' : ''}">
+                    <p class="mb-2">${m.content}</p>
+                    <small class="text-muted">From: <strong>${m.sender}</strong> — ${m.time}</small>
+                </div>
+            `).join('');
+        });
+}
+
+// 添加私信表单
+function addMessageForm() {
+    document.getElementById('messages-section').innerHTML += `
+        <div class="mt-4 p-4 bg-dark rounded border border-primary">
+            <h5>给谭老师发私信（仅老师可见）</h5>
+            <form onsubmit="event.preventDefault(); sendMessage()">
+                <textarea id="msg-input" class="form-control mb-3" rows="3" placeholder="写下你的问题或建议..." required></textarea>
+                <button type="submit" class="btn btn-primary">发送私信</button>
+            </form>
+        </div>
+    `;
+}
+
+// 发送私信
+function sendMessage() {
+    const content = document.getElementById('msg-input').value.trim();
+    if (!content) return;
+    const btn = document.querySelector('#messages-section button');
+    btn.disabled = true; btn.textContent = '发送中...';
+    const csrfToken = await fetchCsrfToken();
+    if (!csrfToken) return;
+    
+    fetch(`/zuoye/api/messages/${classId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded',
+                   'X-CSRFToken': csrfToken },
+        body: new URLSearchParams({ content }),
+        credentials: 'include'
+    })
+    .then(() => {
+        document.getElementById('msg-input').value = '';
+        loadMessages(window.IS_TEACHER);
+    })
+    .finally(() => {
+        btn.disabled = false; btn.textContent = '发送私信';
+    });
+}
+
+// === 主程序：获取登录状态并启动一切 ===
+fetch('/zuoye/api/current_user')
+    .then(r => r.json())
+    .then(user => {
+        if (user.authenticated) {
+            // 老师
+            if (user.is_teacher) {
+                document.getElementById('teacher-controls').innerHTML = 
+                    `<a href="/zuoye/announcement/create?class_id=${classId}" class="btn btn-success btn-sm">发布新公告</a>`;
+                window.IS_TEACHER = true;
+                loadMessages(true);
+            }
+            // 学生
+            if (user.role === 'student') {
+                loadMessages(false);
+                addMessageForm();
+            }
+        }
+        // 无论登录与否都加载公告和课件
+        loadAnnouncements();
+        loadPresentations();
+    })
+    .catch(() => {
+        loadAnnouncements();
+        loadPresentations();
+    });
+
+</script>
+{% endblock %}
