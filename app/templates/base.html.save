@@ -1,0 +1,75 @@
+{# base.html #}
+<!DOCTYPE html>
+<html lang="en">
+<!-- templates/base.html – add before </head> -->
+<script>
+    const vapidPublicKey = "{{ config['VAPID_PUBLIC_KEY'] }}";
+
+    function urlBase64ToUint8Array(base64String) {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+        const rawData = window.atob(base64);
+        return Uint8Array.from([...rawData].map(char => char.charCodeAt(0)));
+    }
+
+    async function subscribeUser() {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+
+        const registration = await navigator.serviceWorker.register('/static/sw.js');
+        const subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
+        });
+
+        await fetch('/zuoye/push/subscribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(subscription)
+        });
+    }
+
+    // Auto-subscribe on login
+    document.addEventListener('DOMContentLoaded', () => {
+        if (Notification.permission === "default") {
+            Notification.requestPermission().then(permission => {
+                if (permission === "granted") subscribeUser();
+            });
+        } else if (Notification.permission === "granted") {
+            subscribeUser();
+        }
+    });
+</script>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assignment App</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{{ url_for('main.index') }}">Assignment App</a>
+            <div class="navbar-nav">
+                {% if current_user.is_authenticated %}
+                    <a class="nav-link" href="{{ url_for('main.student_dashboard') }}">Dashboard</a>
+                    <a class="nav-link" href="{{ url_for('assignments.submit_assignment') }}">Submit</a>
+                    <a class="nav-link" href="{{ url_for('assignments.view_submissions_history') }}">Submissions</a>
+                    {# ADDED PROFILE LINK HERE #}
+                    <a class="nav-link" href="{{ url_for('main.profile') }}">Profile</a>
+                    <a class="nav-link" href="{{ url_for('main.logout') }}">Logout</a>
+                {% else %}
+                    <a class="nav-link" href="{{ url_for('main.register') }}">Register</a>
+                    <a class="nav-link" href="{{ url_for('main.login') }}">Login</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+    <div class="container mt-4">
+        {% block content %}{% endblock %}
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- CUSTOM SCRIPTS GO HERE -->
+    {% block scripts %}{% endblock %}
+</body>
+</html>

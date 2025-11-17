@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Assignment Report - {{ cls.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-chart-bar me-2"></i> Assignment Report: {{ cls.name }}</h2>
+        <div>
+            <a href="{{ url_for('assignments.assignment_report_csv', class_id=cls.id) }}" 
+               class="btn btn-success btn-sm me-2" 
+               title="Download CSV">
+                <i class="fas fa-file-csv"></i> Download CSV
+            </a>
+            <a href="{{ url_for('assignments.class_detail', class_id=cls.id) }}" 
+               class="btn btn-secondary btn-sm">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+        </div>
+    </div>
+
+    {% if assignments %}
+    <div class="table-responsive">
+        <table class="table table-bordered table-hover align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th rowspan="2">Student ID</th>
+                    <th rowspan="2">Name</th>
+                    {% for assignment in assignments %}
+                    <th colspan="1" class="text-center">
+                        {{ assignment.title }}<br>
+                        <small class="text-muted">Weight: {{ assignment.weight }}</small>
+                    </th>
+                    {% endfor %}
+                    <th rowspan="2" class="text-center bg-success text-white">Average</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sid, data in report.items() %}
+                <tr>
+                    <td>{{ data.student_id }}</td>
+                    <td><strong>{{ data.username }}</strong></td>
+                    {% for assignment in assignments %}
+                    <td class="text-center">
+                        {% set grade = data.grades[assignment.id] %}
+                        {% if grade is not none %}
+                            <span class="badge 
+                                {% if grade >= 90 %}bg-success
+                                {% elif grade >= 70 %}bg-warning
+                                {% elif grade >= 60 %}bg-orange
+                                {% else %}bg-danger{% endif %}">
+                                {{ grade }}
+                            </span>
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+                    <td class="text-center fw-bold">
+                        {% if data.average is not none %}
+                            <span class="badge bg-primary fs-6">{{ data.average }}</span>
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        No assignments found in this class.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

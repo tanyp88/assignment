@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Create Assignment{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-7">
+            <div class="card shadow-lg border-0 rounded-lg">
+                <div class="card-header bg-primary text-white">
+                    <h2 class="h4 mb-0">Create New Assignment</h2>
+                </div>
+                <div class="card-body p-4 p-md-5">
+                    <p class="text-muted">
+                        Posting for class: <strong>{{ class_obj.name }}</strong>
+                    </p>
+                    
+                    {# The form submits back to the same route for POST handling #}
+                    <form method="POST" action="{{ url_for('assignments.create_assignment', class_id=class_obj.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        
+                        {# Title Field #}
+                        <div class="mb-4">
+                            <label for="title" class="form-label font-weight-bold">Assignment Title</label>
+                            <input type="text" class="form-control" id="title" name="title" required 
+                                   maxlength="100" placeholder="e.g., 'Chapter 5: Recursion Problems'">
+                        </div>
+
+                        {# Description Field #}
+                        <div class="mb-4">
+                            <label for="description" class="form-label font-weight-bold">Description / Instructions</label>
+                            <textarea class="form-control" id="description" name="description" rows="6" required
+                                      placeholder="Provide detailed instructions, requirements, and grading criteria for students."></textarea>
+                        </div>
+
+                        {# Due Date Field #}
+                        <div class="mb-4">
+                            <label for="due_date" class="form-label font-weight-bold">Due Date</label>
+                            <input type="datetime-local" class="form-control" id="due_date" name="due_date" required>
+                        </div>
+
+                        {# Action Buttons #}
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end pt-3">
+                            <button type="submit" class="btn btn-success btn-lg px-4">
+                                <i class="bi bi-save me-2"></i> Post Assignment
+                            </button>
+                            <a href="{{ url_for('assignments.class_detail', class_id=class_obj.id) }}" class="btn btn-outline-secondary btn-lg px-4">
+                                <i class="bi bi-x-circle me-2"></i> Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

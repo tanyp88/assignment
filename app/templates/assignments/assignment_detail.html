@@ -1,0 +1,31 @@
+<!-- ./assignment_app/app/templates/assignments/assignment_detail.html -->
+{% extends "base.html" %}
+{% block title %}Assignment Details{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    <h2>{{ assignment.title }}</h2>
+    <p>{{ assignment.description or 'No description provided.' }}</p>
+    <p><strong>Due Date:</strong> {{ assignment.due_date }}</p>
+    <h3>Submissions</h3>
+    {% if submissions %}
+        <ul class="list-group">
+        {% for submission in submissions %}
+            <li class="list-group-item">
+                <strong>Student:</strong> {{ submission.student.username }}<br>
+                <strong>Content:</strong> {{ submission.content or 'No content provided.' }}<br>
+                {% if submission.file_path %}
+                    <strong>File:</strong> <a href="{{ url_for('assignments.serve_user_file', filename=submission.file_path.split('/')[-1]) }}">Download</a><br>
+                {% endif %}
+                <strong>Grade:</strong> {{ submission.grade or 'Not graded' }}<br>
+                <strong>Feedback:</strong> {{ submission.feedback or 'No feedback provided.' }}
+                {% if current_user.role == 'teacher' %}
+                    <a href="{{ url_for('assignments.view_submissions', assignment_id=assignment.id) }}" class="btn btn-sm btn-warning">Grade</a>
+                {% endif %}
+            </li>
+        {% endfor %}
+        </ul>
+    {% else %}
+        <p>No submissions yet.</p>
+    {% endif %}
+</div>
+{% endblock %}

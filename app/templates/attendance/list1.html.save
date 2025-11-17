@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Attendance - {{ class_name }}</h2>
+<p><strong>Date:</strong> {{ current_date }}</p>
+
+<div id="status"></div>
+
+<ul class="list-group">
+  {% for s in students %}
+  <li class="list-group-item d-flex justify-content-between align-items-center">
+    {{ s.name }} ({{ s.student_id }})
+    <span class="badge bg-{{ 'success' if s.present else 'danger' }} rounded-pill">
+      {{ 'Present' if s.present else 'Absent' }}
+    </span>
+  </li>
+  {% endfor %}
+</ul>
+
+<script>
+  async function poll() {
+    const res = await fetch('/attendance/status/{{ class_id }}');
+    const data = await res.json();
+    if (data.success) {
+      const el = document.getElementById('status');
+      el.innerHTML = `<p><strong>${data.attendees.length}</strong> checked in</p>`;
+    }
+  }
+  setInterval(poll, 3000);
+  poll();
+</script>
+{% endblock %}

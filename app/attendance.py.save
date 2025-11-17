@@ -1,0 +1,242 @@
+# app/attendance.py
+from flask import Blueprint, render_template, request, jsonify, url_for, redirect, flash, send_file, after_this_request, make_response
+from flask_login import login_required, current_user
+import uuid, qrcode, io, json
+from app import db, logger, get_redis_client as get_redis
+from app.models import Class, Attendance, User
+from datetime import datetime
+
+attendance = Blueprint('attendance', __name__)
+
+# --- MOCK REDIS (reuse existing) ---
+#from app.qq import get_redis  # reuse same mock redis
+
+ATTENDANCE_KEY = 'attendance:token:'
+
+@attendance.route('/generate/<int:class_id>')
+@login_required
+def generate_qr(class_id):
+    if current_user.role != 'teacher':
+        return "Forbidden", 403
+    cls = Class.query.get_or_404(class_id)
+    if cls.teacher_id != current_user.id:
+        return "Not your class", 403
+
+    token = str(uuid.uuid4())
+    payload = {'class_id': class_id, 'teacher_id': current_user.id}
+    REDIS_TTL_SECONDS = 300  # 5 minutes
+
+    get_redis().setex(ATTENDANCE_KEY + token, REDIS_TTL_SECONDS, json.dumps(payload).encode())
+    logger.info(f"Attendance QR generated: class {class_id}, token {token}, expires in 5 minutes")
+
+    qr_content = token  # ← Only the UUID
+
+        # --- START SIZE CHANGE ---
+    # Create an instance of QrCode, setting box_size (pixel size of each box)
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=25,  # Each square will be 25x25 pixels
+        border=4,     # 4 squares thick white border (default)
+    )
+    qr.add_data(qr_content)
+    qr.make(fit=True)
+    
+    # Use the new instance to create the image
+    img = qr.make_image(fill_color="black", back_color="white")
+    # --- END SIZE CHANGE ---
+
+    #img = qrcode.make(qr_content)
+
+    buf = io.BytesIO()
+    img.save(buf, 'PNG')
+    buf.seek(0)
+    return send_file(buf, mimetype='image/png')
+
+@attendance.route('/scan/<path:token>')
+@attendance.route('/scan/')
+def scan(token=None):
+    # Explicitly check for the string 'None' which some systems pass when default=None is used
+    if token == 'None':
+        token = None    
+    if not token:
+        # Show QR scanner page (no specific token yet)
+        #return render_template('scan_attendance.html', token='', class_name='Select Class', class_id=None)
+        return render_template('scan_attendance.html', token='', class_name='Expired', class_id=None)
+
+    data = get_redis().get(ATTENDANCE_KEY + token)
+    if not data:
+        #return "<h1>QR Code Expired</h1>", 400
+        return render_template('scan_attendance.html', token='', class_name='Expired', class_id=None)
+
+    payload = json.loads(data)
+    class_id = payload['class_id']
+    cls = Class.query.get(class_id)
+    return render_template('scan_attendance.html',
+                           token=token,
+                           class_name=cls.name,
+                           class_id=class_id)
+
+# app/attendance.py → replace entire checkin() function
+@attendance.route('/checkin', methods=['POST'])
+def checkin():
+    try:
+        # --------------------------------------------------------------
+        # 1. Get JSON payload
+        # --------------------------------------------------------------
+        payload = request.get_json(silent=True) or {}
+        token       = payload.get('token')
+        student_id  = payload.get('student_id')
+
+        logger.info(f"[1] Checkin request – token={token}, student_id={student_id}")
+
+        if not token or not student_id:
+            logger.warning("[1] Missing token or student_id")
+            resp = jsonify(success=False, message="Missing token or student_id")
+            return make_response(resp, 400)
+
+        # --- NEW: Geolocation Data Extraction ---
+        latitude = payload.get('latitude')
+        longitude = payload.get('longitude')
+
+        if latitude is None or longitude is None:
+            # Decide if location is MANDATORY. If so, return an error.
+            logger.warning(f"Checkin for student {student_id} failed: Location data missing.")
+            resp = jsonify(success=False, message="Location data is required for attendance.")
+            return make_response(resp, 400)
+
+        logger.info(f"Checkin attempt: Student {student_id}, Token {token}, Location: ({latitude}, {longitude})")
+        
+        # --- Your existing Redis and database logic goes here ---
+        # --------------------------------------------------------------
+        # 2. Redis lookup
+        # --------------------------------------------------------------
+        redis_key = f"{ATTENDANCE_KEY}{token}"
+        raw = get_redis().get(redis_key)
+
+        logger.info(f"[2] Redis key={redis_key} → found={raw is not None}")
+
+        if not raw:
+            logger.warning("[2] Token not in Redis")
+            resp = jsonify(success=False, message="Invalid or expired QR code")
+            return make_response(resp, 400)
+
+        # --------------------------------------------------------------
+        # 3. Decode Redis payload
+        # --------------------------------------------------------------
+        try:
+            redis_payload = json.loads(raw)
+        except json.JSONDecodeError as e:
+            logger.error(f"[3] JSON decode error: {e}")
+            resp = jsonify(success=False, message="Corrupted QR data")
+            return make_response(resp, 400)
+
+        class_id = redis_payload.get('class_id')
+        logger.info(f"[3] Redis payload → class_id={class_id}")
+
+        if not class_id:
+            logger.warning("[3] No class_id in payload")
+            resp = jsonify(success=False, message="Invalid QR payload")
+            return make_response(resp, 400)
+
+        # --------------------------------------------------------------
+        # 4. Load Class
+        # --------------------------------------------------------------
+        cls = Class.query.get(class_id)
+        if not cls:
+            logger.warning(f"[4] Class id={class_id} not found in DB")
+            resp = jsonify(success=False, message="Class not found")
+            return make_response(resp, 404)
+        logger.info(f"[4] Class loaded → name='{cls.name}', teacher_id={cls.teacher_id}")
+
+        # --------------------------------------------------------------
+        # 5. Load Student
+        # --------------------------------------------------------------
+        student = User.query.filter_by(student_id=student_id).first()
+        if not student:
+            logger.warning(f"[5] Student student_id={student_id} not found")
+            resp = jsonify(success=False, message="Student not found")
+            return make_response(resp, 404)
+        logger.info(f"[5] Student → id={student.id}, username='{student.username}'")
+
+        # --------------------------------------------------------------
+        # 6. Verify enrollment
+        # --------------------------------------------------------------
+        enrolled = db.session.execute(
+            db.text("""
+                SELECT 1 FROM enrolled_classes
+                WHERE user_id = :uid AND class_id = :cid
+            """),
+            {"uid": student.id, "cid": class_id}
+        ).scalar()
+
+        logger.info(f"[6] Enrollment check → enrolled={bool(enrolled)}")
+        if not enrolled:
+            resp = jsonify(success=False, message="Not enrolled in this class")
+            return make_response(resp, 403)
+
+        # --------------------------------------------------------------
+        # 7. Already checked-in today?
+        # --------------------------------------------------------------
+        today = datetime.now().date()
+        already = Attendance.query.filter(
+            Attendance.student_id == student_id,
+            Attendance.class_id == class_id,
+            db.func.date(Attendance.checkin_time) == today
+        ).first()
+
+        logger.info(f"[7] Already checked-in today → {bool(already)}")
+        if already:
+            resp = jsonify(success=True, message="Already checked in today")
+            return make_response(resp, 200)
+            #return redirect(url_for('main.student_dashboard'))
+            #resp = make_response(redirect(url_for('main.student_dashboard')))
+            #resp.headers['Content-Type'] = 'text/html'
+            #return resp
+
+        # --------------------------------------------------------------
+        # 8. Record attendance
+        # --------------------------------------------------------------
+        att = Attendance(
+            class_id=class_id,
+            student_id=student_id,
+            checkin_time=datetime.now(),
+            latitude=latitude,
+            longitude=longitude
+        )
+        db.session.add(att)
+        db.session.commit()
+        logger.info("[8] Attendance record saved")
+
+        # --------------------------------------------------------------
+        # 9. Push notification to teacher
+        # --------------------------------------------------------------
+        try:
+            teacher = User.query.get(cls.teacher_id)
+            if teacher:
+                from app.push import send_push
+                send_push(
+                    user_id=teacher.id,
+                    title="New Check-in",
+                    body=f"{student.username} checked in to {cls.name}"
+                )
+                logger.info("[9] Push sent to teacher")
+            else:
+                logger.warning("[9] Teacher not found")
+        except Exception as push_err:
+            logger.error(f"[9] Push failed: {push_err}", exc_info=True)
+
+        # --------------------------------------------------------------
+        # 10. SUCCESS
+        # --------------------------------------------------------------
+        logger.info("[10] Check-in SUCCESS")
+        resp = jsonify(success=True, message="Check-in successful!")
+        return make_response(resp, 200)
+
+    # --------------------------------------------------------------
+    # Global exception catcher – never let a 500 bubble up
+    # --------------------------------------------------------------
+    except Exception as exc:
+        logger.error(f"[ERROR] Unexpected crash in checkin(): {exc}", exc_info=True)
+        resp = jsonify(success=False, message="Server error")
+        return make_response(resp, 500)

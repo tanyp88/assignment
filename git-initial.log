@@ -1,0 +1,168 @@
+tanyep@chunk:~/docker/assignment_app$ nano .gitignore
+tanyep@chunk:~/docker/assignment_app$ git init
+hint: Using 'master' as the name for the initial branch. This default branch name
+hint: is subject to change. To configure the initial branch name to use in all
+hint: of your new repositories, which will suppress this warning, call:
+hint:
+hint:   git config --global init.defaultBranch <name>
+hint:
+hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+hint: 'development'. The just-created branch can be renamed via this command:
+hint:
+hint:   git branch -m <name>
+Initialized empty Git repository in /home/tanyep/docker/assignment_app/.git/
+tanyep@chunk:~/docker/assignment_app$ git add .
+tanyep@chunk:~/docker/assignment_app$ git commit -m "Initial commit including .gitignore and all source files"
+Author identity unknown
+
+*** Please tell me who you are.
+
+Run
+
+  git config --global user.email "you@example.com"
+  git config --global user.name "Your Name"
+
+to set your account's default identity.
+Omit --global to set the identity only in this repository.
+
+fatal: empty ident name (for <tanyep@chunk.cctan.ca>) not allowed
+tanyep@chunk:~/docker/assignment_app$ git config --global user.email "tanyp@szu.edu.cn"
+tanyep@chunk:~/docker/assignment_app$ git config --global user.name "tanyp88"
+tanyep@chunk:~/docker/assignment_app$ git commit -m "Initial commit including .gitignore and all source files"
+[master (root-commit) e563d41] Initial commit including .gitignore and all source files
+ 115 files changed, 9068 insertions(+)
+ create mode 100644 .dockerignore
+ create mode 100644 .gitignore
+ create mode 100644 Dockerfile
+ create mode 100644 __pycache__/__init__.cpython-312.pyc
+ create mode 100644 __pycache__/app.cpython-312.pyc
+ create mode 100644 __pycache__/celery_app.cpython-312.pyc
+ create mode 100644 __pycache__/models.cpython-312.pyc
+ create mode 100644 __pycache__/routes.cpython-312.pyc
+ create mode 100644 __pycache__/run_flask.cpython-312.pyc
+ create mode 100644 __pycache__/tasks.cpython-312.pyc
+ create mode 100644 app.py.save
+ create mode 100644 app/__init__.py
+ create mode 100644 app/__pycache__/__init__.cpython-312.pyc
+ create mode 100644 app/__pycache__/attendance.cpython-312.pyc
+ create mode 100644 app/__pycache__/config.cpython-312.pyc
+ create mode 100644 app/__pycache__/models.cpython-312.pyc
+ create mode 100644 app/__pycache__/push.cpython-312.pyc
+ create mode 100644 app/__pycache__/qq.cpython-312.pyc
+ create mode 100644 app/__pycache__/qq_login.cpython-312.pyc
+ create mode 100644 app/__pycache__/routes.cpython-312.pyc
+ create mode 100644 app/__pycache__/tasks.cpython-312.pyc
+ create mode 100644 app/__pycache__/wechat.cpython-312.pyc
+ create mode 100644 app/assignments/__pycache__/routes.cpython-312.pyc
+ create mode 100644 app/assignments/routes.py
+ create mode 100644 app/attendance.py
+ create mode 100644 app/attendance.py.save
+ create mode 100644 app/celery_config.py.save
+ create mode 100644 app/config.py
+ create mode 100644 app/models.py
+ create mode 100644 app/push.py
+ create mode 100644 app/qq.py
+ create mode 100644 app/qq_login.py
+ create mode 100644 app/routes.py
+ create mode 100644 app/static/styles.css
+ create mode 100644 app/static/sw.js
+ create mode 100644 app/tasks.py
+ create mode 100644 app/tasks.py.save
+ create mode 100644 app/templates/assignment_detail.html.save
+ create mode 100644 app/templates/assignments/assignment_detail.html
+ create mode 100644 app/templates/assignments/class_detail copy 2.html
+ create mode 100644 app/templates/assignments/class_detail copy.html
+ create mode 100644 app/templates/assignments/class_detail.html
+ create mode 100644 app/templates/assignments/create.html
+ create mode 100644 app/templates/assignments/dashboard.html.save
+ create mode 100644 app/templates/assignments/edit_assignment.html
+ create mode 100644 app/templates/assignments/edit_class.html
+ create mode 100644 app/templates/assignments/grade.html
+ create mode 100644 app/templates/assignments/manage.html
+ create mode 100644 app/templates/assignments/submissions.html
+ create mode 100644 app/templates/assignments/submit.html
+ create mode 100644 app/templates/assignments/submit1.html
+ create mode 100644 app/templates/assignments/view_submission copy.html
+ create mode 100644 app/templates/assignments/view_submission.html
+ create mode 100644 app/templates/assignments/view_submissions.html
+ create mode 100644 app/templates/assignments_manage.html.save
+ create mode 100644 app/templates/attendance/attendance_scan.html
+ create mode 100644 app/templates/attendance/checkin_result.html
+ create mode 100644 app/templates/attendance/list.html
+ create mode 100644 app/templates/attendance/list1.html.save
+ create mode 100644 app/templates/attendance/scan.html
+ create mode 100644 app/templates/attendance/scan.html.save
+ create mode 100644 app/templates/attendance_list.html.save
+ create mode 100644 app/templates/attendance_scan.html.save
+ create mode 100644 app/templates/base copy.html.save
+ create mode 100644 app/templates/base.html
+ create mode 100644 app/templates/base.html.save
+ create mode 100644 app/templates/bind_qq.html
+ create mode 100644 app/templates/bind_qq_success.html
+ create mode 100644 app/templates/bind_success.html
+ create mode 100644 app/templates/bind_wechat.html
+ create mode 100644 app/templates/bind_wechat.html.save
+ create mode 100644 app/templates/classes_manage.html
+ create mode 100644 app/templates/create_assignment.html
+ create mode 100644 app/templates/dashboard copy.html.save
+ create mode 100644 app/templates/dashboard.html
+ create mode 100644 app/templates/grade_assignment_form.html.save
+ create mode 100644 app/templates/index.html
+ create mode 100644 app/templates/index1 copy.html
+ create mode 100644 app/templates/login.html
+ create mode 100644 app/templates/macros.html
+ create mode 100644 app/templates/partials/assignment_list.html
+ create mode 100644 app/templates/profile.html
+ create mode 100644 app/templates/profile.html.save
+ create mode 100644 app/templates/profile.html.wechat
+ create mode 100644 app/templates/register.html
+ create mode 100644 app/templates/register1.html.save
+ create mode 100644 app/templates/scan_attendance.html.save
+ create mode 100644 app/templates/student_assignment_detail.html
+ create mode 100644 app/templates/submissions.html.save
+ create mode 100644 app/templates/submit.html.save
+ create mode 100644 app/templates/view_students.html
+ create mode 100644 app/templates/view_submission.html.save
+ create mode 100644 app/wechat.py
+ create mode 100644 celery_app.py
+ create mode 100644 cmds .txt
+ create mode 100644 email.qmd
+ create mode 100644 git.initial.sh
+ create mode 100644 migrations/README
+ create mode 100644 migrations/__pycache__/env.cpython-312.pyc
+ create mode 100644 migrations/alembic.ini
+ create mode 100644 migrations/env.py
+ create mode 100644 migrations/script.py.mako
+ create mode 100644 migrations/versions/771abd074efd_add_push_subscriptions.py
+ create mode 100644 migrations/versions/__pycache__/771abd074efd_add_push_subscriptions.cpython-312.pyc
+ create mode 100644 migrations/versions/__pycache__/abe1cc92213c_initial_migration.cpython-312.pyc
+ create mode 100644 migrations/versions/__pycache__/eb1a6fe6e146_add_qq_users_attendance_wechatuser.cpython-312.pyc
+ create mode 100644 migrations/versions/__pycache__/f9217bee10f1_add_latitude_and_longitude_to_attendance.cpython-312.pyc
+ create mode 100644 migrations/versions/abe1cc92213c_initial_migration.py
+ create mode 100644 migrations/versions/eb1a6fe6e146_add_qq_users_attendance_wechatuser.py
+ create mode 100644 migrations/versions/f9217bee10f1_add_latitude_and_longitude_to_attendance.py
+ create mode 100644 requirements.txt
+ create mode 100644 routes.py.save
+ create mode 100644 run_flask.py
+ create mode 100644 schedule/celerybeat-schedule
+ create mode 100644 seed.py
+tanyep@chunk:~/docker/assignment_app$ git branch -M main
+tanyep@chunk:~/docker/assignment_app$ git remote add origin https://github.com/tanyp88/assignment.git
+tanyep@chunk:~/docker/assignment_app$ git push -u origin main
+Username for 'https://github.com': tanyp88
+Password for 'https://tanyp88@github.com':
+remote: Invalid username or token. Password authentication is not supported for Git operations.
+fatal: Authentication failed for 'https://github.com/tanyp88/assignment.git/'
+tanyep@chunk:~/docker/assignment_app$ git push -u origin main
+Username for 'https://github.com': tanyp88
+Password for 'https://tanyp88@github.com':
+Enumerating objects: 132, done.
+Counting objects: 100% (132/132), done.
+Delta compression using up to 4 threads
+Compressing objects: 100% (127/127), done.
+Writing objects: 100% (132/132), 204.56 KiB | 2.25 MiB/s, done.
+Total 132 (delta 9), reused 0 (delta 0), pack-reused 0
+remote: Resolving deltas: 100% (9/9), done.
+To https://github.com/tanyp88/assignment.git
+ * [new branch]      main -> main
+Branch 'main' set up to track remote branch 'main' from 'origin'.

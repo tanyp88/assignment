@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Submissions – {{ student.username }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1>
+                <i class="fas fa-user-graduate me-2"></i>
+                {{ student.username }} ({{ student.student_id }})
+            </h1>
+            <p class="text-muted mb-0">All submissions across your classes</p>
+        </div>
+        <a href="{{ url_for('main.manage_classes') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Classes
+        </a>
+    </div>
+
+    {% if submissions %}
+    <div class="card shadow">
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Assignment</th>
+                        <th>Class</th>
+                        <th>Submitted</th>
+                        <th>Grade</th>
+                        <th>Feedback</th>
+                        <th>File</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sub in submissions %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('assignments.view_submission', assignment_id=sub.assignment_id,student_id=student.id) }}"
+                               class="text-primary">
+                                {{ sub.assignment_title }}
+                            </a>
+                        </td>
+                        <td><span class="badge bg-info">{{ sub.class_name }}</span></td>
+                        <td>{{ sub.submitted_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td>
+                            {% if sub.grade is not none %}
+                                <span class="badge bg-success">{{ sub.grade }}/100</span>
+                            {% else %}
+                                <span class="badge bg-warning">Not graded</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if sub.feedback %}
+                                <small>{{ sub.feedback[:60] }}{% if sub.feedback|length > 60 %}...{% endif %}</small>
+                            {% else %}
+                                <em class="text-muted">—</em>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if sub.file_path %}
+                                <a href="{{ url_for('assignments.download_file', submission_id=sub.id) }}"
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-download"></i>
+                                </a>
+                            {% else %}
+                                <em class="text-muted">—</em>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info text-center">
+        No submissions found for this student in your classes.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,204 @@
+{# <templates>attendance_scan.html - Scan Page for teacher #}
+{% extends "base.html" %}
+
+{% block title %}签到 - {{ class_name }}{% endblock %}
+
+{% block content %}
+
+<div class="container mt-5">
+<div class="row">
+<!-- QR Code Column -->
+<div class="col-md-6 mb-4">
+<div class="card shadow-lg">
+<div class="card-header bg-success text-white">
+<h4 class="mb-0"><i class="fas fa-qrcode me-2"></i> 班级：{{ class_name }} 签到二维码</h4>
+</div>
+<div class="card-body text-center">
+<p class="lead">请用浏览器扫码签到</p>
+
+                <!-- QR Code Image -->
+                <div class="d-flex justify-content-center my-4 p-3 border rounded border-success bg-light">
+                    <img id="qr-code-image"
+                         src="{{ url_for('attendance.generate_attendance_qrcode', token=attendance_token) }}"
+                         alt="签到二维码"
+                         style="width: 500px; height: 500px; border-radius: 8px;">
+                </div>
+
+                <p class="text-muted small">
+                    二维码仅对本次课有效。
+                </p>
+                <hr>
+                <a href="{{ url_for('attendance.attendance_list', class_id=class_id) }}" class="btn btn-info">查看完整签到名单</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Real-time Status Column -->
+    <div class="col-md-6">
+        <div class="card shadow-lg h-100">
+            <div class="card-header bg-info text-white">
+                <h4 class="mb-0">
+                    <i class="fas fa-user-check me-2"></i> 实时签到状态
+                </h4>
+            </div>
+            <div class="card-body">
+                <h5 class="card-title mb-3">
+                    今日已签到人数: <span id="attendee-count" class="badge bg-success fs-5">0</span>
+                </h5>
+                
+                <ul id="attendee-list" class="list-group list-group-flush" style="max-height: 400px; overflow-y: auto;">
+                    <!-- 实时签到学生列表 -->
+                </ul>
+
+                <div id="no-attendees-message" class="alert alert-light mt-3 text-center" role="alert">
+                    等待首位学生签到...
+                </div>
+            </div>
+            <div class="card-footer text-muted small text-center">
+                最后更新时间: <span id="last-update">--:--:--</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// -----------------------------------------------------------------
+// Real-time Attendance Polling Logic
+// -----------------------------------------------------------------
+
+// CORRECT: Safely inject class_id from Flask into JS
+const classId = {{ class_id | tojson }};
+
+// CORRECT: Use template string with proper Flask syntax
+const pollUrl = `/zuoye/attendance/status/${classId}`;
+const pollInterval = 3000; // Poll every 3 seconds
+
+// --- CRITICAL CHANGE: Declare, but DO NOT initialize globally ---
+let attendeeListEl;
+let attendeeCountEl;
+let noAttendeesMessageEl;
+let lastUpdateEl;
+
+
+// Track displayed students to avoid duplicates
+let displayedStudentIds = new Set();
+
+/**
+ * Fetch current attendance status from server
+ */
+async function fetchAttendanceStatus() {
+    try {
+        const response = await fetch(pollUrl);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        const data = await response.json();
+
+        if (data.success) {
+            updateUI(data.attendees || []);
+        } else {
+            console.error("Server error:", data.message || "Unknown");
+        }
+    } catch (error) {
+        console.error("Polling error:", error);
+    }
+}
+
+
+
+/**
+ * Update UI with new attendees only
+ */
+function updateUI(attendees) {
+    //console.log("Attendees received:", attendees); // <-- Add this
+    //console.log("attendeeCountEl:", attendeeCountEl); // <-- Add this
+    //console.log("attendeeListEl:", attendeeListEl); // <-- Add this
+    //console.log("noAttendeesMessageEl:", noAttendeesMessageEl); // <-- Add this
+    //console.log("lastUpdateEl:", lastUpdateEl); // <-- Add this
+    // --- CRITICAL NULL CHECK: BOMB-PROOF THE FUNCTION ---
+    // If any of the required global elements are null, 
+    // it means the script is running on a page where these elements don't exist.
+    if (!attendeeCountEl || !attendeeListEl || !noAttendeesMessageEl || !lastUpdateEl) {
+        // We log a silent message for context, but we don't spam the console 
+        // with the painful "Cannot set properties of null" error.
+        // The script just exits gracefully until the setInterval is naturally cleared.
+        return; 
+    }
+    // ----------------------------------------------------
+    
+    // Update count
+    attendeeCountEl.textContent = attendees.length;
+
+    // Show/hide empty message
+    if (attendees.length === 0) {
+        noAttendeesMessageEl.style.display = 'block';
+        if (attendeeListEl.children.length > 0) {
+            attendeeListEl.innerHTML = '';
+            displayedStudentIds.clear();
+        }
+    } else {
+        noAttendeesMessageEl.style.display = 'none';
+    }
+
+    // Add only new attendees
+    attendees.forEach(attendee => {
+        if (!displayedStudentIds.has(attendee.student_id)) {
+            const checkinDate = new Date(attendee.checkin_time);
+            const checkinTime = checkinDate.toLocaleTimeString('zh-CN', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+
+            const listItem = document.createElement('li');
+            listItem.className = 'list-group-item d-flex justify-content-between align-items-center mb-1 animate__animated animate__fadeInDown';
+
+            listItem.innerHTML = `
+                <div>
+                    <i class="fas fa-check-circle text-success me-2"></i>
+                    <strong>${escapeHtml(attendee.name)}</strong>
+                    <small class="text-muted">(学号: ${escapeHtml(attendee.student_id)})</small>
+                </div>
+                <span class="badge bg-primary rounded-pill">${checkinTime}</span>
+            `;
+
+            attendeeListEl.prepend(listItem);
+            displayedStudentIds.add(attendee.student_id);
+        }
+    });
+
+    // Update timestamp
+    lastUpdateEl.textContent = new Date().toLocaleTimeString('zh-CN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+}
+// Simple HTML escape to prevent XSS
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// -----------------------------------------------------------------
+// Start Polling
+// -----------------------------------------------------------------
+document.addEventListener('DOMContentLoaded', () => {
+    // --- CRITICAL CHANGE: Initialization MOVED HERE ---
+    attendeeListEl = document.getElementById('attendee-list');
+    attendeeCountEl = document.getElementById('attendee-count');
+    noAttendeesMessageEl = document.getElementById('no-attendees-message');
+    lastUpdateEl = document.getElementById('last-update');
+    
+    // Now the polling can safely start
+    fetchAttendanceStatus(); // Initial load
+    setInterval(fetchAttendanceStatus, pollInterval);
+});
+</script>
+{% endblock %}

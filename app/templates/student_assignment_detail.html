@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}{{ student.username }} - Assignments{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3>{{ student.username }} ({{ student.student_id }})</h3>
+            <p class="text-muted">Class: {{ class_obj.name }}</p>
+        </div>
+        <a href="{{ url_for('main.view_students', class_id=class_obj.id) }}" class="btn btn-secondary">
+            Back to List
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5>Assignment Submissions</h5>
+        </div>
+        <div class="card-body">
+            {% if assignments %}
+            <ul class="list-group list-group-flush">
+                {% for assignment in assignments %}
+                {% set sub = submissions.get(assignment.id) %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>{{ assignment.title }}</strong><br>
+                        <small class="text-muted">Due: {{ assignment.due_date.strftime('%Y-%m-%d') }}</small>
+                    </div>
+                    <div>
+                        {% if sub %}
+                            {% if sub.grade is not none %}
+                                <span class="badge bg-success fs-6">{{ sub.grade }}/100</span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark">Submitted</span>
+                            {% endif %}
+                            <a href="{{ url_for('assignments.view_submission', assignment_id=assignment.id, student_id=student.id) }}"
+                               class="btn btn-sm btn-outline-primary ms-2">
+                                Grade
+                            </a>
+                        {% else %}
+                            <span class="text-muted">Not submitted</span>
+                        {% endif %}
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="text-muted">No assignments yet.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

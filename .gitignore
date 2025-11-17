@@ -1,0 +1,91 @@
+Standard Python/Flask .gitignore
+
+---------------------------------
+
+1. Python Compiled/Dependency Files
+
+---------------------------------
+
+pycache/          # Directory for compiled Python modules (seen everywhere)
+*.pyc                 # Compiled Python files (e.g., attendance.cpython-312.pyc)
+__pycache__/
+*.o
+*.so
+*.egg
+*.dist-info/
+blog_content/
+static_blog/
+build/
+dist/
+
+---------------------------------
+
+2. Virtual Environments (MANDATORY)
+
+---------------------------------
+
+Prevents committing large dependency folders.
+
+venv/
+env/
+.venv/
+conda_env/
+
+---------------------------------
+
+3. Database & Secret Configuration
+
+---------------------------------
+
+IMPORTANT: Prevents committing API keys, database credentials, and local database files.
+
+.env                  # Common for environment variables
+.flaskenv
+instance/             # Flask instance folder (often holds configuration or SQLite DBs)
+*.db
+*.sqlite
+*.sqlite3
+
+---------------------------------
+
+4. Logs and Temporary Files
+
+---------------------------------
+
+*.log                 # Log files
+*.save                # Files ending in .save (like attendance.py.save, base.html.save)
+celerybeat-schedule   # Celery scheduling state file
+cmds.txt             # Temporary command file
+*.qmd                 # Quarto/R Markdown files (like email.qmd)
+*.save                # Files ending in .save (like attendance.py.save)
+*.sh                  # Shell scripts (like git.initial.sh)
+schedule/             # Celery
+
+---------------------------------
+
+5. IDEs and OS Files
+
+---------------------------------
+
+.idea/                # PyCharm/IntelliJ configuration
+.vscode/              # VS Code settings
+.DS_Store             # macOS system files
+*~                    # Emacs/Vim temporary backup files
+
+---------------------------------
+
+6. Uploads and Generated Assets
+
+---------------------------------
+
+Files uploaded by users that should NOT be tracked by source control.
+
+If 'uploads/' contains files, we should ignore all content but keep the folder
+
+so Flask doesn't crash if it expects it to exist.
+
+uploads/*
+!uploads/.gitkeep      # If you create a .gitkeep file inside uploads, it will track the empty folder.
+
+
+

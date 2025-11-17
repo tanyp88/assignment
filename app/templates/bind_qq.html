@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Bind QQ{% endblock %}
+
+{% block content %}
+<div class="container mt-5 text-center">
+    <div class="card mx-auto" style="max-width: 500px;">
+        <div class="card-header bg-primary text-white">
+            <h3>QQ 扫码绑定</h3>
+        </div>
+        <div class="card-body">
+            <p><strong>{{ username }}</strong> ({{ student_id }})</p>
+            <img id="qr" src="" style="width:250px; height:250px;">
+            <p class="mt-3 text-muted">二维码永不过期</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    const token = "{{ binding_token }}";
+    const img = document.getElementById('qr');
+    function load() {
+        img.src = `/zuoye/qq/generate_qq_qrcode/${token}?t=${Date.now()}`;
+    }
+    load();
+    setInterval(load, 8*60*1000);
+</script>
+{% endblock %}

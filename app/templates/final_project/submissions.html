@@ -1,0 +1,64 @@
+<!-- templates/final_project/submissions.html -->
+{% extends "base.html" %}
+{% block title %}提交列表 - {{ topic.topic_title }}{% endblock %}
+
+{% block content %}
+<h3 class="mb-4">提交列表 - {{ topic.topic_title }}</h3>
+
+<div class="card">
+    <div class="card-body">
+        {% if submissions %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>学生</th>
+                        <th>提交时间</th>
+                        <th>文件</th>
+                        <th>评分</th>
+                        <th>操作</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for sub in submissions %}
+                    <tr>
+                        <td>{{ sub.student.username }}</td>
+                        <td>{{ sub.submitted_at.strftime('%m-%d %H:%M') }}</td>
+                        <td>
+                            {% if sub.file_path %}
+                            <a href="{{ url_for('static', filename=sub.file_path.split('static/')[-1]) }}" target="_blank">
+                                下载
+                            </a>
+                            {% else %}
+                            <em>纯文本</em>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if sub.grade is not none %}
+                            <span class="badge bg-success">{{ sub.grade }}/100</span>
+                            {% else %}
+                            <span class="badge bg-secondary">未批改</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('final_project.grade_project_submission', submission_id=sub.id) }}"
+                               class="btn btn-sm btn-primary">
+                               {{ '重新批改' if sub.grade else 'AI 批改' }}
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+        <p class="text-muted">暂无提交</p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="mt-3">
+    <a href="{{ url_for('final_project.final_project_dashboard', class_id=topic.class_id) }}"
+       class="btn btn-secondary">返回管理</a>
+</div>
+{% endblock %}

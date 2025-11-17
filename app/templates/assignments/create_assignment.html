@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="container mt-5">
+  <h2>{{ title }} for {{ class_obj.name }}</h2>
+
+  <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="mb-3">
+      <label class="form-label">Title</label>
+      <input type="text" name="title" class="form-control" required>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Description (Markdown)</label>
+      <textarea name="description" class="form-control" rows="5"></textarea>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Due Date & Time</label>
+      <input type="datetime-local" name="due_date" class="form-control" required>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Weight (for average calculation)</label>
+      <input type="number" step="0.1" min="0.1" name="weight" class="form-control" value="1.0" required>
+      <small class="text-muted">Default is 1.0. Use 2.0 for double weight, etc.</small>
+    </div>
+
+    <button type="submit" class="btn btn-success">Create Assignment</button>
+    <a href="{{ url_for('assignments.class_detail', class_id=class_obj.id) }}" class="btn btn-secondary ms-2">Cancel</a>
+  </form>
+</div>
+{% endblock %}

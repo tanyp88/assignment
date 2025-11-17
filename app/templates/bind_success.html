@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}绑定成功{% endblock %}
+{% block content %}
+<div class="container mt-5 text-center">
+    <h2 class="text-success">微信绑定成功！</h2>
+    <p>学号：<strong>{{ student_id }}</strong></p>
+    <a href="{{ url_for('main.student_dashboard') }}" class="btn btn-primary">返回主页</a>
+</div>
+{% endblock %}

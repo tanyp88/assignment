@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Announcements{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- ANNOUNCEMENTS -->
+    <h3>Announcements</h3>
+
+    <!-- CREATE BUTTON – TEACHER ONLY -->
+    {% if current_user.role == 'teacher' %}
+    <div class="mb-3 text-end">
+        <a href="{{ url_for('main.announcement_create') }}" class="btn btn-primary">
+            <i class="fas fa-plus me-1"></i> Create Announcement
+        </a>
+    </div>
+    {% endif %}
+    <!-- END CREATE BUTTON -->
+
+    <!-- Global -->
+    <h4>Global</h4>
+    {% for ann in global_announcements %}
+    <div class="card mb-2">
+        <div class="card-body">
+            <h5>{{ ann.title }}</h5>
+            <p>{{ ann.content | safe }}</p>
+            <small class="text-muted">{{ ann.created_at.strftime('%m-%d %H:%M') }} by {{ ann.author.username }}</small>
+        </div>
+    </div>
+    {% endfor %}
+
+    <!-- Class-specific -->
+    {% for item in class_announcements %}
+    <h4>{{ item.class.name }}</h4>
+
+    <!-- Announcements -->
+    {% for ann in item.announcements %}
+    <div class="card mb-2">
+        <div class="card-body">
+            <h5>{{ ann.title }}</h5>
+            <p>{{ ann.content | safe }}</p>
+            <small class="text-muted">{{ ann.created_at.strftime('%m-%d %H:%M') }} by {{ ann.author.username }}</small>
+        </div>
+    </div>
+    {% endfor %}
+
+    <!-- STUDENT: Send Message -->
+    {% if current_user.role == 'student' %}
+    <div class="card border-primary mb-3">
+        <div class="card-body">
+            <form id="msg-form-{{ item.class.id }}" class="send-message-form">
+                <input type="hidden" name="class_id" value="{{ item.class.id }}">
+                <div class="mb-2">
+                    <textarea name="content" class="form-control" rows="2" placeholder="Send private message to teacher..." required></textarea>
+                </div>
+                <button type="submit" class="btn btn-sm btn-primary">Send</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    {% endfor %}
+
+    <!-- PRIVATE MESSAGES (Teacher + Sender only) -->
+    {% if messages %}
+    <h4 class="mt-5">Private Messages</h4>
+    {% for msg in messages %}
+    <div class="card mb-2 {% if current_user.role == 'teacher' %}border-info{% else %}border-success{% endif %}">
+        <div class="card-body">
+            <p class="mb-1">{{ msg.content }}</p>
+            <small class="text-muted">
+                From: <strong>{{ msg.sender.username }}</strong> ({{ msg.sender.student_id }})
+                in <em>{{ msg.class_.name }}</em>
+                — {{ msg.created_at.strftime('%m-%d %H:%M') }}
+            </small>
+        </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+</div>
+
+<script>
+document.querySelectorAll('.send-message-form').forEach(form => {
+    const csrf_token = getCsrfToken(); // Re-fetch the token for safety
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = form.querySelector('button');
+        btn.disabled = true;
+        btn.textContent = 'Sending...';
+
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData);
+
+        try {
+            const res = await fetch('/zuoye/announcement/message', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded',
+                      // --- ADD THIS LINE ---
+                      'X-CSRFToken': csrf_token // Send the token in the required header 
+                },
+                body: new URLSearchParams(data)
+            });
+            const json = await res.json();
+            if (json.success) {
+                form.reset();
+                alert('Message sent!');
+                setTimeout(() => location.reload(), 500);
+            } else {
+                alert(json.message || 'Failed');
+            }
+        } catch (err) {
+            alert('Network error');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Send';
+        }
+    });
+});
+</script>
+{% endblock %}

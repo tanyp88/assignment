@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('blog.index') }}">Blog</a></li>
+            {% if course %}
+            <li class="breadcrumb-item active">{{ course.title }}</li>
+            {% endif %}
+        </ol>
+    </nav>
+    {% block blog_content %}{% endblock %}
+</div>
+{% endblock %}

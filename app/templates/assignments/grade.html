@@ -1,0 +1,32 @@
+<!-- ./assignment_app/app/templates/assignments/grade.html -->
+{% extends "base.html" %}
+{% block title %}Grade Assignment{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    <h2>Grade Assignment: {{ assignment.title }}</h2>
+    {% if submissions %}
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="mb-3">
+                <label for="submission_id" class="form-label">Select Submission</label>
+                <select class="form-control" id="submission_id" name="submission_id">
+                    {% for submission in submissions %}
+                        <option value="{{ submission.id }}">{{ submission.student.username }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="mb-3">
+                <label for="grade" class="form-label">Grade</label>
+                <input type="number" class="form-control" id="grade" name="grade" min="0" max="100">
+            </div>
+            <div class="mb-3">
+                <label for="feedback" class="form-label">Feedback</label>
+                <textarea class="form-control" id="feedback" name="feedback"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Submit Grade</button>
+        </form>
+    {% else %}
+        <p>No submissions to grade.</p>
+    {% endif %}
+</div>
+{% endblock %}

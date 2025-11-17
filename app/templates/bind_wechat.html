@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Bind WeChat Account{% endblock %}
+
+{% block content %}
+<div class="container mt-5 text-center">
+    <div class="card shadow-lg mx-auto" style="max-width: 500px;">
+        <div class="card-header bg-info text-white">
+            <h3 class="mb-0"><i class="fab fa-weixin me-2"></i> WeChat Account Binding</h3>
+        </div>
+
+        <div class="card-body">
+
+            <p class="lead">Please scan the QR code below using your WeChat app to link your account.</p>
+
+            <!-- User Information -->
+            <div class="text-start mb-3 p-3 border rounded bg-light">
+                <p class="mb-1"><strong>Username:</strong> {{ username }}</p>
+                <p class="mb-1"><strong>Student ID:</strong> {{ student_id }}</p>
+            </div>
+
+            <!-- QR Code Area -->
+            <div id="qr-code-area" class="d-flex justify-content-center my-4 p-3 border rounded border-warning">
+                <img id="qr-code-image"
+                     src="{{ url_for('wechat.generate_bind_qrcode', token=binding_token) }}"
+                     alt="WeChat Binding QR Code"
+                     style="width: 250px; height: 250px; border-radius: 8px;">
+            </div>
+
+            <!-- Timer -->
+            <div id="timer-alert" class="alert alert-warning">
+                <i class="fas fa-clock"></i> This QR code expires in <span id="timer">10:00</span>.
+            </div>
+
+            <p class="text-muted small">
+                The QR code auto-refreshes every 8 minutes. No need to reload the page.
+            </p>
+
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+
+{#% block scripts %#}
+<script>
+    // -----------------------------------------------------------------
+    //  CONFIG – must match Python BINDING_EXPIRY_SECONDS
+    // -----------------------------------------------------------------
+    const EXPIRY_SECONDS      = 600;          // 10 minutes
+    const REFRESH_INTERVAL_MS = 8 * 60 * 1000; // 8 minutes
+    const token               = "{{ binding_token }}";
+
+    let secondsLeft = EXPIRY_SECONDS;
+    const timerEl   = document.getElementById('timer');
+    const alertEl   = document.getElementById('timer-alert');
+    const qrImg     = document.getElementById('qr-code-image');
+
+    // -----------------------------------------------------------------
+    //  Load / refresh QR code
+    // -----------------------------------------------------------------
+    function loadQR() {
+        // Cache-buster to force fresh image
+        qrImg.src = `/zuoye/wechat/generate_bind_qrcode/${token}?t=${Date.now()}`;
+    }
+
+    // -----------------------------------------------------------------
+    //  Timer logic
+    // -----------------------------------------------------------------
+    function updateTimer() {
+        if (secondsLeft <= 0) {
+            timerEl.textContent = "EXPIRED – refreshing…";
+            alertEl.classList.remove('alert-warning', 'alert-danger');
+            alertEl.classList.add('alert-danger');
+            qrImg.style.filter = 'grayscale(100%)';
+            clearInterval(timerInterval);
+            setTimeout(loadQR, 1500);   // give backend a moment to generate new token
+            return;
+        }
+
+        secondsLeft--;
+        const mins = String(Math.floor(secondsLeft / 60)).padStart(2, '0');
+        const secs = String(secondsLeft % 60).padStart(2, '0');
+        timerEl.textContent = `${mins}:${secs}`;
+
+        // Red when < 1 minute
+        if (secondsLeft < 60) {
+            alertEl.classList.remove('alert-warning');
+            alertEl.classList.add('alert-danger');
+        }
+    }
+
+    // -----------------------------------------------------------------
+    //  Start everything
+    // -----------------------------------------------------------------
+    const timerInterval = setInterval(updateTimer, 1000);
+    loadQR();                                     // initial load
+    setInterval(loadQR, REFRESH_INTERVAL_MS);     // auto-refresh every 8 min
+
+    // Immediate first tick so we don’t show 10:00 for a full second
+    updateTimer();
+</script>
+{#% endblock %#}

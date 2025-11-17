@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Assignment: {{ assignment.title }}{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="display-5 text-primary mb-3">{{ assignment.title }}</h1>
+            <p class="lead text-muted">
+                Posted in: <strong>{{ assignment.class_.name }}</strong>
+            </p>
+        </div>
+    </div>
+    
+    <div class="card shadow-sm mb-5">
+        <div class="card-body">
+            <h4 class="card-title text-info mb-3">Instructions</h4>
+            <p class="card-text border-start border-4 border-info ps-3 py-1 bg-light rounded">
+                {{ assignment.description }}
+            </p>
+            <div class="d-flex justify-content-between align-items-center mt-4">
+                <small class="text-danger font-weight-bold">
+                    <i class="bi bi-clock me-1"></i> Due Date: {{ assignment.due_date }}
+                </small>
+                {# NOTE: We are skipping an 'Edit Assignment' link for now to keep focus on grading #}
+            </div>
+        </div>
+    </div>
+
+    <!-- Submissions List and Grading Action -->
+    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
+        <h3 class="mb-0">Submissions ({{ submissions | length }})</h3>
+        
+        {# Button to trigger the Celery grading task #}
+        <a href="{{ url_for('assignments.grade_assignment_form', assignment_id=assignment.id) }}" 
+           class="btn btn-warning btn-lg shadow-sm">
+            <i class="bi bi-robot me-2"></i> Auto-Grade Pending Submissions
+        </a>
+    </div>
+
+    {% if not submissions %}
+        <div class="alert alert-info text-center" role="alert">
+            No students have submitted this assignment yet.
+        </div>
+    {% else %}
+        <div class="list-group">
+            {% for submission in submissions %}
+                {% set status_class = {
+                    'submitted': 'list-group-item-warning',
+                    'resubmitted': 'list-group-item-warning',
+                    'reviewed': 'list-group-item-info',
+                    'graded': 'list-group-item-success',
+                    'error': 'list-group-item-danger'
+                }.get(submission.status.lower(), 'list-group-item-light') %}
+
+                <div class="list-group-item {{ status_class }} d-flex justify-content-between align-items-center mb-2 rounded shadow-sm">
+                    <div class="d-flex flex-column">
+                        <h5 class="mb-1">
+                            {{ submission.student.username }} 
+                            <small class="text-muted ms-2">(ID: {{ submission.student.student_id }})</small>
+                        </h5>
+                        <small class="text-dark">
+                            Submitted: {{ submission.submission_date.strftime('%Y-%m-%d %H:%M') }}
+                        </small>
+                    </div>
+
+                    <div class="d-flex align-items-center">
+                        {% if submission.score is not none %}
+                            <span class="badge bg-success me-3 py-2 px-3 h4 mb-0">
+                                Score: {{ submission.score }}
+                            </span>
+                        {% else %}
+                            <span class="badge bg-secondary me-3 py-2 px-3 h4 mb-0">
+                                Status: {{ submission.status }}
+                            </span>
+                        {% endif %}
+
+                        <a href="{{ url_for('main.view_submission', submission_id=submission.id) }}" 
+                           class="btn btn-sm btn-outline-dark">
+                            <i class="bi bi-eye me-1"></i> Review & Grade
+                        </a>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="mt-5 text-center">
+        <a href="{{ url_for('assignments.class_detail', class_id=assignment.class_id) }}" class="btn btn-outline-secondary">
+            &larr; Back to Class Details
+        </a>
+    </div>
+</div>
+{% endblock %}

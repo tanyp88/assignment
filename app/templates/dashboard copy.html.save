@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container mt-4">
+<h1>{{ title }}</h1>
+{% if classes %}
+<ul class="list-group">
+{% for class_ in classes %}
+<li class="list-group-item">
+<h3>{{ class_.name }}</h3>
+<a href="{{ url_for('assignments.class_detail', class_id=class_.id) }}" class="btn btn-sm btn-outline-primary me-2">View Class</a>
+{% if current_user.role == 'teacher' %}
+<a href="{{ url_for('assignments.create_assignment', class_id=class_.id) }}" class="btn btn-sm btn-primary me-2">Create Assignment</a>
+{% endif %}
+{% if class_.assignments %}
+<h4>Assignments</h4>
+<ul class="list-group">
+{% for assignment in class_.assignments %}
+<li class="list-group-item d-flex justify-content-between align-items-center">
+<div>
+<strong>{{ assignment.title }}</strong> (Due: {{ assignment.due_date.strftime('%Y-%m-%d %H:%M') }})
+</div>
+<div>
+{% if current_user.role == 'student' %}
+{# The student link is fine, assuming 'assignments.submit_assignment' only needs assignment_id #}
+<a href="{{ url_for('assignments.submit_assignment1', assignment_id=assignment.id) }}" class="btn btn-sm btn-primary me-2">Submit</a>
+{% endif %}
+{% if current_user.role == 'teacher' %}
+{# FIX: Changed endpoint to assignment_detail and button text to reflect viewing all submissions #}
+<a href="{{ url_for('assignments.assignment_detail', assignment_id=assignment.id) }}" class="btn btn-sm btn-warning me-2">View Submissions</a>
+{% endif %}
+</div>
+</li>
+{% endfor %}
+</ul>
+{% else %}
+<p>No assignments available.</p>
+{% endif %}
+</li>
+{% endfor %}
+</ul>
+{% else %}
+<p>No classes available.</p>
+{% endif %}
+{% if current_user.role == 'teacher' %}
+<a href="{{ url_for('assignments.manage_assignments') }}" class="btn btn-primary mt-3">Manage All Assignments</a>
+{% endif %}
+</div>
+{% endblock %}

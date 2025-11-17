@@ -1,0 +1,186 @@
+<!-- only change the fetch URLs -->
+
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>微信绑定</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #07c160;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #06ae56;
+        }
+        .qrcode-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        #qrcode {
+            max-width: 200px;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .step {
+            display: none;
+        }
+        .step.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2 style="text-align: center;">微信绑定学号</h2>
+        
+        <!-- 步骤1：输入学号 -->
+        <div id="step1" class="step active">
+            <div class="form-group">
+                <label for="student_id">学号</label>
+                <input type="text" id="student_id" placeholder="请输入您的学号">
+            </div>
+            <div class="form-group">
+                <label for="name">姓名</label>
+                <input type="text" id="name" placeholder="请输入您的姓名">
+            </div>
+            <button onclick="verifyStudent()">验证学号</button>
+        </div>
+
+        <!-- 步骤2：显示绑定二维码 -->
+        <div id="step2" class="step">
+            <h3>请使用微信扫描二维码完成绑定</h3>
+            <div class="qrcode-container">
+                <img id="bind_qrcode" src="" alt="绑定二维码">
+            </div>
+            <p>扫描后请在微信中确认绑定信息</p>
+            <div id="bind_status"></div>
+        </div>
+
+        <!-- 步骤3：绑定成功 -->
+        <div id="step3" class="step">
+            <div style="text-align: center;">
+                <h3 class="success">绑定成功！</h3>
+                <p>您的微信已成功绑定学号</p>
+                <div id="bind_info"></div>
+                <button onclick="goToCheckin()">前往签到</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentStudentId = '';
+        let bindToken = '';
+
+        function verifyStudent() {
+            const studentId = document.getElementById('student_id').value;
+            const name = document.getElementById('name').value;
+            
+            if (!studentId || !name) {
+                alert('请填写学号和姓名');
+                return;
+            }
+
+            fetch('/wechat/verify_student', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    student_id: studentId,
+                    name: name
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    currentStudentId = studentId;
+                    showStep(2);
+                    generateBindQRCode(studentId);
+                    checkBindStatus();
+                } else {
+                    alert(data.message);
+                }
+            });
+        }
+
+        function generateBindQRCode(studentId) {
+            // 生成绑定二维码
+            const qrcodeImg = document.getElementById('bind_qrcode');
+            qrcodeImg.src = `/wechat/generate_bind_qrcode?student_id=${studentId}&t=${new Date().getTime()}`;
+        }
+
+        function checkBindStatus() {
+            // 轮询检查绑定状态
+            const checkInterval = setInterval(() => {
+                fetch('/wechat/check_bind_status?student_id=' + currentStudentId)
+                    .then(response => response.json())
+                    .then(data => {
+                        const statusDiv = document.getElementById('bind_status');
+                        if (data.status === 'success') {
+                            clearInterval(checkInterval);
+                            showStep(3);
+                            document.getElementById('bind_info').innerHTML = `
+                                <p><strong>学号：</strong>${data.student_id}</p>
+                                <p><strong>姓名：</strong>${data.name}</p>
+                            `;
+                        } else if (data.status === 'pending') {
+                            statusDiv.innerHTML = '<p class="error">等待微信扫描绑定...</p>';
+                        } else if (data.status === 'not_found') {
+                            statusDiv.innerHTML = '<p class="error">未找到绑定信息，请重新扫描</p>';
+                        }
+                    });
+            }, 2000);
+        }
+
+        function showStep(stepNumber) {
+            // 隐藏所有步骤
+            document.querySelectorAll('.step').forEach(step => {
+                step.classList.remove('active');
+            });
+            // 显示指定步骤
+            document.getElementById('step' + stepNumber).classList.add('active');
+        }
+
+        function goToCheckin() {
+            window.location.href = '/';
+        }
+    </script>
+</body>
+</html>

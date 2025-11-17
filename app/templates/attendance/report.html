@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Attendance Report - {{ cls.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-calendar-check me-2"></i> Attendance Report: {{ cls.name }}</h2>
+        <div>
+            <a href="{{ url_for('attendance.attendance_report_csv', class_id=cls.id) }}"
+               class="btn btn-success btn-sm me-2" title="Download CSV">
+                <i class="fas fa-file-csv"></i> CSV
+            </a>
+            <a href="{{ url_for('attendance.attendance_report', class_id=cls.id) }}"
+               class="btn btn-secondary btn-sm">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+        </div>
+    </div>
+
+    {% if session_dates %}
+    <div class="table-responsive">
+        <table class="table table-bordered table-hover align-middle text-center">
+            <thead class="table-primary">
+                <tr>
+                    <th rowspan="2">Student ID</th>
+                    <th rowspan="2">Name</th>
+                    {% for d in session_dates %}
+                    <th>{{ d.strftime('%m/%d') }}<br><small class="text-muted">{{ d.strftime('%a') }}</small></th>
+                    {% endfor %}
+                    <th rowspan="2">Rate</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sid, data in attendance_map.items() %}
+                <tr>
+                    <td>{{ data.student_id }}</td>
+                    <td><strong>{{ data.username }}</strong></td>
+                    {% for d in session_dates %}
+                    <td>
+                        {% if data.attendance[d] %}
+                            <i class="fas fa-check text-success"></i>
+                        {% else %}
+                            <i class="fas fa-times text-danger"></i>
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+                    <td>
+                        {% set rate = (data.present_count / data.total_sessions * 100)|round(1) %}
+                        <span class="badge 
+                            {% if rate >= 90 %}bg-success
+                            {% elif rate >= 70 %}bg-warning
+                            {% else %}bg-danger{% endif %}">
+                            {{ rate }}%
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="alert alert-info">No attendance records yet.</div>
+    {% endif %}
+</div>
+{% endblock %}

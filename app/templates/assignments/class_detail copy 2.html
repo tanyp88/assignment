@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Class Details{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    <h2>{{ class_.name }}</h2>
+    <p>{{ class_.description or 'No description provided.' }}</p>
+    <h3>Assignments</h3>
+    {% if class_.assignments %}
+        <ul class="list-group">
+        {% for assignment in class_.assignments %}
+            <li class="list-group-item">
+                <strong>{{ assignment.title }}</strong> (Due: {{ assignment.due_date.strftime('%Y-%m-%d %H:%M') if assignment.due_date else 'No due date' }})
+                {% if current_user.role == 'student' %}
+                    <a href="{{ url_for('assignments.submit_assignment1', assignment_id=assignment.id) }}" class="btn btn-sm btn-primary">Submit</a>
+                {% endif %}
+                {% if current_user.role == 'teacher' %}
+                    <a href="{{ url_for('assignments.view_submissions', assignment_id=assignment.id) }}" class="btn btn-sm btn-primary">View Submissions</a>
+                    <a href="{{ url_for('assignments.autograde_assignment', assignment_id=assignment.id) }}" class="btn btn-sm btn-success ml-2">Autograde (using AI)</a>
+                {% endif %}
+            </li>
+        {% endfor %}
+        </ul>
+    {% else %}
+        <p>No assignments available.</p>
+    {% endif %}
+</div>
+{% endblock %}

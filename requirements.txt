@@ -1,0 +1,30 @@
+google-genai
+flask==3.0.3 #2.3.3
+flask-sqlalchemy==3.1.1
+pymysql==1.1.1
+celery==5.4.0
+redis==5.0.8
+google-generativeai==0.8.3
+gunicorn==23.0.0
+werkzeug==3.0.1 #2.3.8
+pandas==2.2.3
+reportlab==4.2.5
+flask-login
+Flask-Migrate
+flask-migrate
+mysqlclient
+imaplib2
+google-cloud-pubsub
+Flask-Mail==0.9.1  # Added to resolve the error
+Flask-WTF==1.2.1
+python-dotenv
+qrcode[pil]==7.4.2
+Pillow==10.4.0
+pywebpush
+
+frozen-flask==1.0.2  # for static site generation
+markdown==3.5.2  # for rendering Markdown content
+PyYAML==6.0.1    # for YAML front-matter
+
+python-magic 
+

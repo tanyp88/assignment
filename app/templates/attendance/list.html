@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block title %}Attendance List{% endblock %}
+
+{% block content %}
+<h2>Attendance for {{ class_name }}</h2>
+
+<!-- Summary cards -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card bg-light text-center">
+            <div class="card-body">
+                <h5>Total</h5>
+                <p class="h3">{{ total_students }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-success text-white text-center">
+            <div class="card-body">
+                <h5>Present</h5>
+                <p class="h3" id="present-count">0</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-danger text-white text-center">
+            <div class="card-body">
+                <h5>Absent</h5>
+                <p class="h3" id="absent-count">0</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>#</th>
+            <th>Student ID</th>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for student in students %}
+        <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ student.student_id }}</td>
+            <td>{{ student.name }}</td>
+            <td id="status-{{ student.id }}">
+                {% if student.present %}
+                    <span class="badge bg-success">Present</span>
+                {% else %}
+                    <span class="badge bg-danger">Absent</span>
+                {% endif %}
+            </td>
+            <td>
+                <button 
+                    class="btn btn-sm {% if student.present %}btn-outline-danger{% else %}btn-outline-success{% endif %}"
+                    data-student-id="{{ student.id }}"
+                    data-current-status="{{ student.present|lower }}"
+                    onclick="toggleAttendance(this)">
+                    {% if student.present %}Mark Absent{% else %}Mark Present{% endif %}
+                </button>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+    // SAFE: Use | tojson | safe
+    const CLASS_ID = {{ cls.id | tojson | safe }};
+    const TOTAL_STUDENTS = {{ total_students | tojson | safe }};
+
+    const getCsrfToken = () => {
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        return meta ? meta.getAttribute('content') : null;
+    };
+
+    function toggleAttendance(button) {
+        const csrf = getCsrfToken();
+        const studentId = button.dataset.studentId;
+        const isPresent = button.dataset.currentStatus === 'true';
+        const action = isPresent ? 'mark_absent' : 'mark_present';
+
+        const url = `/zuoye/attendance/${CLASS_ID}/toggle`;
+        const csrfToken = getCsrfToken();
+        if (!csrfToken) {
+            alert('CSRF token missing');
+            return;
+        }
+
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({
+                student_id: parseInt(studentId),
+                action: action
+            })
+        })
+        .then(r => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.json();
+        })
+        .then(data => {
+            if (data.success) {
+                const statusCell = document.getElementById('status-' + studentId);
+                const newStatus = data.new_status;
+
+                if (newStatus === 'present') {
+                    statusCell.innerHTML = '<span class="badge bg-success">Present</span>';
+                    button.textContent = 'Mark Absent';
+                    button.classList.remove('btn-outline-success');
+                    button.classList.add('btn-outline-danger');
+                } else {
+                    statusCell.innerHTML = '<span class="badge bg-danger">Absent</span>';
+                    button.textContent = 'Mark Present';
+                    button.classList.remove('btn-outline-danger');
+                    button.classList.add('btn-outline-success');
+                }
+                button.dataset.currentStatus = (newStatus === 'present');
+                updateSummary();
+            }
+        })
+        .catch(err => {
+            console.error('Toggle error:', err);
+            alert('Network error');
+        });
+    }
+
+    function updateSummary() {
+        const present = document.querySelectorAll('.badge.bg-success').length;
+        document.getElementById('present-count').textContent = present;
+        document.getElementById('absent-count').textContent = TOTAL_STUDENTS - present;
+    }
+
+    document.addEventListener('DOMContentLoaded', updateSummary);
+</script>
+{% endblock %}

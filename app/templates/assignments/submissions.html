@@ -1,0 +1,25 @@
+<!-- ./assignment_app/app/templates/assignments/submissions.html -->
+{% extends "base.html" %}
+{% block title %}Your Submissions{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    <h2>Your Submissions</h2>
+    {% if submissions %}
+        <ul class="list-group">
+        {% for submission in submissions %}
+            <li class="list-group-item">
+                <strong>Assignment:</strong> {{ submission.assignment.title }}<br>
+                <strong>Content:</strong> {{ submission.content or 'No content provided.' }}<br>
+                {% if submission.file_path %}
+                    <strong>File:</strong> <a href="{{ url_for('static', filename=submission.file_path.split('/')[-1]) }}">Download</a><br>
+                {% endif %}
+                <strong>Grade:</strong> {{ submission.grade or 'Not graded' }}<br>
+                <strong>Feedback:</strong> {{ submission.feedback or 'No feedback provided.' }}
+            </li>
+        {% endfor %}
+        </ul>
+    {% else %}
+        <p>No submissions yet.</p>
+    {% endif %}
+</div>
+{% endblock %}

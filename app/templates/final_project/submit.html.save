@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %} 提交项目 {% endblock %}
+
+{% block scripts %}
+<!-- Marked.js + Highlight.js -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/highlight.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.css">
+
+<style>
+    #preview { border: 1px solid #ddd; min-height: 200px; padding: 15px; background: #f9f9f9; border-radius: 8px; }
+    .form-control { font-family: 'Courier New', monospace; }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const textarea = document.getElementById('content_md');
+    const preview = document.getElementById('preview');
+    const updatePreview = () => {
+        const html = marked.parse(textarea.value);
+        preview.innerHTML = html;
+        hljs.highlightAll();
+    };
+    textarea.addEventListener('input', updatePreview);
+    updatePreview();
+});
+
+</script>
+{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">提交项目 - {{ topic_title }}</h1>
+<p><strong>已选题目：</strong> {{ selection.topic.topic_title }}</p>
+
+<form method="post" enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="mb-3">
+        <label class="form-label">上传 .md 文件（可选）</label>
+        <input type="file" name="file" accept=".md,text/markdown" class="form-control">
+        <small class="text-muted">上传后将覆盖文本框内容</small>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">或直接输入 Markdown 内容</label>
+        <textarea name="content_md" id="content_md" rows="12" class="form-control" placeholder="# 项目标题\n\n## 内容...">{{ latest.content_md if latest else '' }}</textarea>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <button type="submit" class="btn btn-success btn-lg">提交（覆盖上次）</button>
+        </div>
+        <div class="col-md-6">
+            <div id="preview"></div>
+        </div>
+    </div>
+</form>
+
+{% if latest %}
+<div class="mt-4 alert alert-info">
+    <strong>上次提交时间：</strong> {{ latest.submitted_at.strftime('%Y-%m-%d %H:%M') }}
+    {% if latest.file_path %}
+        <a href="{{ url_for('static', filename=latest.file_path) }}" target="_blank" class="btn btn-sm btn-outline-primary ms-3">
+            下载 .md
+        </a>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

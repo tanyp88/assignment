@@ -1,0 +1,153 @@
+import os
+import yaml
+import markdown
+import shutil
+from flask import Flask, render_template_string, abort
+from flask_frozen import Freezer
+from jinja2 import Environment, FileSystemLoader
+from flask_wtf.csrf import CSRFProtect
+
+app = Flask(__name__)
+freezer = Freezer(app)
+
+csrf = CSRFProtect()
+
+CONTENT_DIR = '/app/blog-content'
+OUTPUT_DIR = '/app/static-blog'
+TEMPLATE_DIR = os.path.join(CONTENT_DIR, 'templates')
+
+app.config['FREEZER_DESTINATION'] = OUTPUT_DIR
+app.config['FREEZER_BASE_URL'] = 'https://chunk.cctan.ca/zuoye/blog/'
+app.config['FREEZER_RELATIVE_URLS'] = False
+
+env = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
+
+_courses_cache = None
+
+def get_courses():
+    global _courses_cache
+    if _courses_cache is None:
+        path = os.path.join(CONTENT_DIR, 'courses.yaml')
+        print(f"[DEBUG] Loading courses from: {path}")
+        if not os.path.exists(path):
+            _courses_cache = []
+        else:
+            with open(path, 'r', encoding='utf-8') as f:
+                data = yaml.safe_load(f)
+                _courses_cache = data.get('courses', []) or []
+                _courses_cache = sorted(_courses_cache, key=lambda x: x.get('order', 999))
+                print(f"[DEBUG] Cached {len(_courses_cache)} courses")
+    return _courses_cache
+
+def load_announcements(course_id):
+    path = os.path.join(CONTENT_DIR, course_id, 'announcements')
+    items = []
+    if os.path.exists(path):
+        for f in sorted(os.listdir(path)):
+            if f.endswith('.md'):
+                with open(os.path.join(path, f), 'r', encoding='utf-8') as mf:
+                    content = mf.read()
+                    if content.startswith('---'):
+                        parts = content.split('---', 2)
+                        meta = yaml.safe_load(parts[1]) if len(parts) > 1 else {}
+                        body = markdown.markdown(parts[2] if len(parts) > 2 else '')
+                    else:
+                        meta = {}
+                        body = markdown.markdown(content)
+                    items.append({
+                        'title': meta.get('title', f.replace('.md', '')),
+                        'date': meta.get('date', ''),
+                        'content': body
+                    })
+    return items
+
+def load_presentations(course_id):
+    path = os.path.join(CONTENT_DIR, course_id, 'presentations')
+    items = []
+    if os.path.exists(path):
+        for f in sorted(os.listdir(path)):
+            if f.lower().endswith(('.pdf', '.html', '.pptx')):
+                items.append({'file': f, 'name': f})
+    return items
+
+@app.route('/')
+def index():
+    courses = get_courses()
+    template = env.get_template('index.html.j2')
+    return template.render(courses=courses)
+
+@app.route('/course/<course_id>.html')
+def course_page(course_id):
+    courses = get_courses()
+    course = next((c for c in courses if c['id'] == course_id), None)
+    if not course:
+        abort(404)
+    ann = load_announcements(course_id)
+    pres = load_presentations(course_id)
+    template = env.get_template('course.html.j2')
+    return template.render(course=course, course_id=course_id, ann=ann, pres=pres)
+
+@freezer.register_generator
+def index():
+    yield {}
+
+@freezer.register_generator
+def course_page():
+    for course in get_courses():
+        yield {'course_id': course['id']}
+
+@app.route('/static/<path:filename>')
+def static_files(filename):
+    return 'dummy', 200
+
+
+if __name__ == '__main__':
+    # ... (freezer.freeze() logic)
+    with app.app_context():
+        print("[FREEZER] Starting freeze...")
+        freezer.freeze()
+        
+        static_root = os.path.join(OUTPUT_DIR, 'static')
+        os.makedirs(static_root, exist_ok=True)
+    
+        for course in get_courses():
+            src = os.path.join(CONTENT_DIR, course['id'], 'presentations')
+            dst = os.path.join(static_root, course['id'], 'presentations')
+            
+            print(f"[COPY] {src} to {dst}")
+            
+            if os.path.exists(src):
+                # 1. Clean up old destination before copying (optional but safer for re-runs)
+                if os.path.exists(dst):
+                    shutil.rmtree(dst)
+                    
+                # 2. Use copytree to copy the entire directory recursively
+                shutil.copytree(src, dst)
+                print("  Copied directory tree successfully.")
+            else:
+                print(f"  Source directory not found: {src}")
+
+    print(f"[SUCCESS] Static blog generated in {OUTPUT_DIR}")
+'''
+
+if __name__ == '__main__':
+    with app.app_context():
+        print("[FREEZER] Starting freeze...")
+        freezer.freeze()
+
+        static_root = os.path.join(OUTPUT_DIR, "static")
+        os.makedirs(static_root, exist_ok=True)
+        for course in get_courses():
+            src = os.path.join(CONTENT_DIR, course["id"], "presentations")
+            dst = os.path.join(static_root, course["id"], "presentations")
+            print(f"[COPY] {src} to {dst}")
+            if os.path.exists(src):
+                os.makedirs(dst, exist_ok=True)
+                for f in os.listdir(src):
+                    src_file = os.path.join(src, f)
+                    dst_file = os.path.join(dst, f)
+                    if os.path.isfile(src_file):
+                        shutil.copy2(src_file, dst_file)
+                        print(f"  Copied: {f}")
+        print(f"[SUCCESS] Static blog generated in {OUTPUT_DIR}")
+'''

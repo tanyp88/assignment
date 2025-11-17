@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Welcome to SwiftCheck{% endblock %}
+{% block content %}
+<div class="container my-5">
+
+    <!-- 1. Hero Section (Jumbotron style) -->
+    <div class="p-5 text-center bg-white rounded-4 shadow-lg mb-5 border border-primary border-3">
+        <div class="d-flex align-items-center justify-content-center mb-3">
+            <i class="fas fa-rocket fa-3x text-primary me-3"></i>
+            <h1 class="display-4 fw-bold text-dark">Welcome to SwiftCheck</h1>
+        </div>
+        <p class="lead mb-4 text-secondary">
+            Your centralized portal for **seamless Homework Management** and **instant Attendance Tracking**. Focus on learning, we'll handle the logistics.
+        </p>
+
+        <!-- Primary Call to Action Buttons -->
+        <div class="d-grid gap-3 d-sm-flex justify-content-sm-center">
+            <a href="{{ url_for('main.login') }}" class="btn btn-primary btn-lg px-4 me-sm-3 shadow-sm">
+                <i class="fas fa-sign-in-alt me-2"></i> Log In Now
+            </a>
+            <a href="{{ url_for('main.register') }}" class="btn btn-outline-secondary btn-lg px-4 shadow-sm">
+                <i class="fas fa-user-plus me-2"></i> Create Account
+            </a>
+        </div>
+    </div>
+
+    <!-- 2. Features Section: Highlight Core Value Propositions -->
+    <h2 class="text-center mb-5 text-muted fw-light">Designed to Empower Students and Educators</h2>
+    <div class="row g-4 mb-5">
+        
+        <!-- Feature 1: Assignment Tracking -->
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100 border-0 bg-white">
+                <div class="card-body text-center p-4">
+                    <i class="fas fa-clipboard-list fa-4x text-info mb-3"></i>
+                    <h3 class="card-title h4 fw-bold">Efficient Assignment Tracking</h3>
+                    <p class="card-text text-muted">
+                        View assignment details, submit homework digitally, and receive instant grade notifications. Stay organized and meet every deadline with ease.
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Feature 2: Attendance Check-in -->
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100 border-0 bg-white">
+                <div class="card-body text-center p-4">
+                    <i class="fas fa-qrcode fa-4x text-success mb-3"></i>
+                    <h3 class="card-title h4 fw-bold">Swift Attendance Check-in</h3>
+                    <p class="card-text text-muted">
+                        Use secure QR codes or quick manual inputs to log class attendance accurately. Maintain perfect attendance records effortlessly.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 3. Final Call to Action -->
+    <div class="text-center mt-5 p-4 bg-dark text-white rounded-4 shadow-lg">
+        <p class="lead mb-3">Ready to transform your class management?</p>
+        <a href="{{ url_for('main.register') }}" class="btn btn-warning btn-lg fw-bold">
+            Join SwiftCheck Today! <i class="fas fa-arrow-circle-right ms-2"></i>
+        </a>
+    </div>
+
+</div>
+{% endblock %}

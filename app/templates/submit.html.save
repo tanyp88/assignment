@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Submit Assignment{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    <h2>Submit Assignment</h2>
+    <form method="POST" action="{{ url_for('main.submit_assignment') }}" class="needs-validation" novalidate>
+        <div class="mb-3">
+            <label for="assignment_id" class="form-label">Assignment</label>
+            <select class="form-select" id="assignment_id" name="assignment_id" required>
+                <option value="">Select an assignment</option>
+                {% for assignment in assignments %}
+                    <option value="{{ assignment.id }}">{{ assignment.title }} ({{ assignment.course.name }})</option>
+                {% endfor %}
+            </select>
+            <div class="invalid-feedback">Please select an assignment.</div>
+        </div>
+        <div class="mb-3">
+            <label for="class_id" class="form-label">Class</label>
+            <select class="form-select" id="class_id" name="class_id" required>
+                <option value="">Select a class</option>
+                {% for class in classes %}
+                    <option value="{{ class.id }}">{{ class.name }}</option>
+                {% endfor %}
+            </select>
+            <div class="invalid-feedback">Please select a class.</div>
+        </div>
+        <div class="mb-3">
+            <label for="content" class="form-label">Submission Content</label>
+            <textarea class="form-control" id="content" name="content" rows="5" required></textarea>
+            <div class="invalid-feedback">Please enter your submission content.</div>
+        </div>
+        <button type="submit" class="btn btn-primary">Submit</button>
+    </form>
+</div>
+<script>
+    (function () {
+        'use strict'
+        var forms = document.querySelectorAll('.needs-validation')
+        Array.prototype.slice.call(forms).forEach(function (form) {
+            form.addEventListener('submit', function (event) {
+                if (!form.checkValidity()) {
+                    event.preventDefault()
+                    event.stopPropagation()
+                }
+                form.classList.add('was-validated')
+            }, false)
+        })
+    })()
+</script>
+{% endblock %}

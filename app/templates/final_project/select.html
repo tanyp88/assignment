@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}选择题目{% endblock %}
+
+{% block content %}
+<h3 class="mb-4">选择期末项目题目</h3>
+
+
+<div classivateclass="row">
+    {% for topic in topics %}
+    <div class="col-md-6 mb-3">
+        <div class="card h-100 {% if topic.is_full() %}border-danger{% else %}border-success{% endif %}">
+            <div class="card-body d-flex flex-column">
+                <h5 class="card-title">{{ topic.topic_title }}</h5>
+                <p class="card-text flex-grow-1">{{ topic.rendered_description  }}</p>
+                <div class="mt-auto">
+                    <p class="mb-2">
+                        <strong>人数：</strong>
+                        <span class="badge bg-{{ 'danger' if topic.is_full() else 'primary' }}">
+                            {{ topic.current_students() }} / {{ topic.max_students }}
+                        </span>
+                    </p>
+                    {% if selected and selected.topic_id == topic.id %}
+                        <span class="badge bg-success fs-6">已选择</span>
+                        <a href="{{ url_for('final_project.submit_project', class_id=topic.class_id) }}" class="btn btn-primary btn-sm float-end">
+                            提交项目
+                        </a>
+                    {% elif topic.is_full() %}
+                        <button class="btn btn-danger" disabled>已满</button>
+                    {% else %}
+                        <form method="post" class="d-inline" onsubmit="this.querySelector('button').disabled=true;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="topic_id" value="{{ topic.id }}">
+                            <button type="submit" class="btn btn-success">
+                                {% if selected and selected.topic_id == topic.id %}
+                                    已选择
+                                {% else %}
+                                    选择此题
+                                {% endif %}
+                            </button>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/highlight.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.css">
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // Markdown 渲染
+    document.querySelectorAll('.markdown-body').forEach(el => {
+        const raw = el.getAttribute('data-md');
+        const html = raw === '无描述' ? '<em class="text-muted">无描述</em>' : marked.parse(raw);
+        el.innerHTML = html;
+        hljs.highlightAll();
+    });
+});
+</script>
+
+{% endblock %}

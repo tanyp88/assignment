@@ -1,0 +1,8 @@
+.monospace-content {
+    /* This specifies a generic monospace font.
+       Browsers will pick a default monospace font (e.g., Courier New, Consolas). */
+    font-family: monospace;
+
+    /* OPTIONAL: You can specify a preference for specific monospace fonts */
+    /* font-family: 'Consolas', 'Monaco', monospace; */
+}

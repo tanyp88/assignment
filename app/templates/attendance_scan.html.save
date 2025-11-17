@@ -1,0 +1,15 @@
+{# attendance_scan.html #}
+
+{% extends "base.html" %}
+{% block title %}签到 - {{ class_name }}{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    <h3>班级：{{ class_name }}</h3>
+    <p>请学生用微信扫描下方二维码签到</p>
+    <div class="text-center">
+        <img src="{{ url_for('wechat.generate_attendance_qrcode', class_id=class_id) }}" alt="签到二维码">
+    </div>
+    <hr>
+    <a href="{{ url_for('wechat.attendance_list', class_id=class_id) }}" class="btn btn-info">查看签到名单</a>
+</div>
+{% endblock %}

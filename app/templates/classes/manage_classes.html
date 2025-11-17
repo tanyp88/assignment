@@ -1,0 +1,116 @@
+{# Manage Classes Template classes/manage_classes.html #}
+{% extends "base.html" %}
+{% block title %}Manage Classes{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4 text-3xl font-extrabold text-gray-900 border-b pb-2">
+        <i class="fas fa-school me-2 text-indigo-600"></i> Manage Classes
+    </h1>
+
+    {% if current_user.role != 'teacher' %}
+        <div class="alert alert-danger">Access Denied: Only teachers can manage classes.</div>
+    {% else %}
+        <div class="d-flex justify-content-end mb-3 gap-2">
+            <a href="{{ url_for('main.create_class') }}" class="btn btn-success btn-lg shadow-sm">
+                <i class="fas fa-plus me-2"></i> Add New Class
+            </a>
+            <a href="{{ url_for('assignments.grade_all_ungraded') }}" class="btn btn-warning btn-lg shadow-sm"
+               onclick="return confirm('Grade ALL ungraded submissions?')">
+                <i class="fas fa-check-double me-2"></i> Grade All
+            </a>
+        </div>
+        
+<!-- QUOTA BANNER -->
+<div id="quota-banner" style="background:#ffebee; color:#c62828; padding:12px; text-align:center; font-family:Arial; display:none; margin:15px 0; border-radius:6px; border:1px solid #ffcdd2;">
+  <div style="font-weight:bold; font-size:1.1em;">
+    Grading Paused: Daily quota reached
+  </div>
+  <div style="margin-top:8px; font-size:1.3em; font-weight:bold;">
+    Resumes in <span id="countdown">00:00:00</span>
+  </div>
+  <div style="font-size:0.9em; margin-top:6px; color:#8b1a1a;">
+    Next reset: <span id="reset-time"></span>
+  </div>
+</div>
+
+        {% if classes %}
+            <div class="card shadow-lg">
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>ID</th>
+                                <th>Class Name</th>
+                                <th>Enrolled</th>
+                                <th>Assignments</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for class_ in classes %}
+                            <tr>
+                                <th scope="row">{{ class_.id }}</th>
+                                <td><strong class="text-primary">{{ class_.name }}</strong></td>
+                                <td>{{ class_.students | length }}</td>
+                                <td>{{ class_.assignments | length }}</td>
+                                <td class="text-nowrap">
+                                    <a href="{{ url_for('assignments.class_detail', class_id=class_.id) }}"
+                                       class="btn btn-sm btn-outline-info me-1">
+                                        <i class="fas fa-eye"></i> View
+                                    </a>
+                                    <a href="{{ url_for('assignments.edit_class', class_id=class_.id) }}"
+                                       class="btn btn-sm btn-outline-secondary me-1">
+                                        <i class="fas fa-edit"></i> Edit
+                                    </a>
+                                    <a href="{{ url_for('main.class_students', class_id=class_.id) }}"
+                                       class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-users"></i> Students
+                                    </a>
+                                        <a href="{{ url_for('final_project.final_project_dashboard', class_id=class_.id) }}" 
+                                        class="btn btn-sm btn-outline-success">
+                                        期末项目
+                                    </a>
+
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% else %}
+            <div class="alert alert-info text-center">No classes yet.</div>
+        {% endif %}
+
+    {% endif %}
+</div>
+
+<script>
+function updateQuotaBanner() {
+  fetch('/zuoye/api/quota-status')
+    .then(response => response.json())
+    .then(data => {
+      const banner = document.getElementById('quota-banner');
+      const countdownEl = document.getElementById('countdown');
+      const resetTimeEl = document.getElementById('reset-time');
+
+      if (data.status === 'locked') {
+        countdownEl.textContent = data.countdown;
+        resetTimeEl.textContent = data.resets_at;
+        banner.style.display = 'block';
+      } else {
+        banner.style.display = 'none';
+      }
+    })
+    .catch(err => {
+      console.error('Quota API failed:', err);
+      document.getElementById('quota-banner').style.display = 'none';
+    });
+}
+
+// Update every second
+setInterval(updateQuotaBanner, 1000);
+updateQuotaBanner(); // Initial call
+</script>
+
+{% endblock %}

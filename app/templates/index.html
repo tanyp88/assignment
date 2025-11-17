@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}欢迎使用 SwiftCheck{% endblock %}
+{% block content %}
+<div class="container my-5">
+
+    <!-- 1. Hero Section (Jumbotron style) -->
+    <div class="p-5 text-center bg-white rounded-4 shadow-lg mb-5 border border-primary border-3">
+        <div class="d-flex align-items-center justify-content-center mb-3">
+            <i class="fas fa-rocket fa-3x text-primary me-3"></i>
+            <h1 class="display-4 fw-bold text-dark">欢迎来到 SwiftCheck</h1>
+        </div>
+        <p class="lead mb-4 text-secondary">
+            您的**作业管理**和**即时考勤跟踪**集中门户。专注于学习，我们将处理所有后勤事务。
+        </p>
+
+        <!-- Primary Call to Action Buttons -->
+        <div class="d-grid gap-3 d-sm-flex justify-content-sm-center">
+            <a href="{{ url_for('main.login') }}" class="btn btn-primary btn-lg px-4 me-sm-3 shadow-sm">
+                <i class="fas fa-sign-in-alt me-2"></i> 立即登录
+            </a>
+            <a href="{{ url_for('main.register') }}" class="btn btn-outline-secondary btn-lg px-4 shadow-sm">
+                <i class="fas fa-user-plus me-2"></i> 创建账户
+            </a>
+        </div>
+    </div>
+
+    <!-- 2. Features Section: Highlight Core Value Propositions -->
+    <h2 class="text-center mb-5 text-muted fw-light">旨在赋能学生和教育工作者</h2>
+    <div class="row g-4 mb-5">
+        
+        <!-- Feature 1: Assignment Tracking -->
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100 border-0 bg-white">
+                <div class="card-body text-center p-4">
+                    <i class="fas fa-clipboard-list fa-4x text-info mb-3"></i>
+                    <h3 class="card-title h4 fw-bold">高效的作业跟踪</h3>
+                    <p class="card-text text-muted">
+                        查看作业详情，数字化提交作业，并接收即时成绩通知。轻松保持井然有序，按时完成所有截止日期。
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Feature 2: Attendance Check-in -->
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100 border-0 bg-white">
+                <div class="card-body text-center p-4">
+                    <i class="fas fa-qrcode fa-4x text-success mb-3"></i>
+                    <h3 class="card-title h4 fw-bold">快速考勤签到</h3>
+                    <p class="card-text text-muted">
+                        使用安全的二维码或快速手动输入，准确记录课堂考勤。轻松维护完美的出勤记录。
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 3. Final Call to Action -->
+    <div class="text-center mt-5 p-4 bg-dark text-white rounded-4 shadow-lg">
+        <p class="lead mb-3">准备好改革您的班级管理了吗？</p>
+        <a href="{{ url_for('main.register') }}" class="btn btn-warning btn-lg fw-bold">
+            立即加入 SwiftCheck！ <i class="fas fa-arrow-circle-right ms-2"></i>
+        </a>
+    </div>
+
+</div>
+{% endblock %}

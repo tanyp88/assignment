@@ -1,0 +1,84 @@
+{# assignment_app/app/templates/profile.html #}
+{% extends "base.html" %}
+{% block title %}User Profile{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    <h2>User Profile</h2>
+    
+    <!-- --------------------------------------------------- -->
+    <!-- NEW: WeChat Binding Button -->
+    <!-- --------------------------------------------------- -->
+    <div class="mb-4">
+        {# In a real application, you would check if the user is already bound #}
+        {% if not wechat_openid %} 
+            <a href="{{ url_for('wechat.bind_wechat') }}" class="btn btn-info btn-lg">
+                <i class="fab fa-weixin"></i> Bind WeChat Account
+            </a>
+            <p class="text-muted mt-2">Binding allows you to use the WeChat mini-program for quick actions and attendance.</p>
+        {% else %}
+            <button class="btn btn-success btn-lg" disabled>
+                <i class="fab fa-weixin"></i> WeChat Account Bound
+            </button>
+            <p class="text-success mt-2">Your account is successfully linked to a WeChat ID.</p>
+            {# Optionally add an unbind button here #}
+        {% endif %}
+    </div>
+    <!-- --------------------------------------------------- -->
+    
+    <div class="row">
+        <div class="col-md-6">
+            <p><strong>Student ID:</strong> {{ current_user.student_id }}</p>
+            <p><strong>Username:</strong> {{ current_user.username }}</p>
+            <p><strong>Email:</strong> {{ current_user.email }}</p>
+            <p><strong>Enrolled Classes:</strong>
+                {% if current_class_ids %}
+                    <ul>
+                        {% for class_id in current_class_ids %}
+                            {# Note: Use the 'class' variable name with caution as it's a reserved word in Python #}
+                            {% set class_obj = classes|selectattr('id', 'equalto', class_id)|first %}
+                            <li>{{ class_obj.name if class_obj else 'Unknown Class' }}</li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <span>None</span>
+                {% endif %}
+            </p>
+        </div>
+    </div>
+    
+    <h3>Update Profile</h3>
+    {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    
+    <form method="POST" action="{{ url_for('main.profile') }}">
+        <div class="form-group">
+            <label for="username">Username</label>
+            <input type="text" class="form-control" id="username" name="username" value="{{ current_user.username }}" required>
+        </div>
+        <div class="form-group">
+            <label for="email">Email Address</label>
+            <input type="email" class="form-control" id="email" name="email" value="{{ current_user.email }}" required>
+        </div>
+        <div class="form-group">
+            <label for="class_ids">Select Classes (Hold Ctrl/Cmd to select multiple)</label>
+            <select class="form-control" id="class_ids" name="class_ids" multiple size="5">
+                {% for class in classes %}
+                    <option value="{{ class.id }}" 
+                            {% if class.id in current_class_ids %}selected{% endif %}>
+                        {{ class.name }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary mt-3">Update Profile</button>
+    </form>
+</div>
+{% endblock %}

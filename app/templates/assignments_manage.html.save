@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+{% extends "base.html" %}
+{% block title %}Assignment Management{% endblock %}
+{% block content %}
+<div class="max-w-7xl mx-auto bg-white p-8 rounded-xl shadow-2xl">
+    <h2 class="text-3xl font-extrabold text-gray-900 mb-6 border-b pb-2">Teacher Assignment Management</h2>
+    
+    <!-- Class Selection Filter -->
+    <div class="mb-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
+        <label for="class_select" class="block text-sm font-medium text-gray-700 mb-2">Select Class to Manage</label>
+        <select id="class_select" 
+                onchange="loadAssignments()"
+                class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md shadow-sm transition duration-150 ease-in-out">
+            <option value="">-- Select a Class --</option>
+            {% for class in classes %}
+                <option value="{{ class.id }}">{{ class.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <!-- Actions and Assignment List -->
+    <div id="management_area" class="hidden">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-2xl font-bold text-gray-800">Assignments</h3>
+            <button onclick="openAssignmentModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-md shadow-lg hover:bg-indigo-700 transition duration-150">
+                + Add New Assignment
+            </button>
+        </div>
+
+        <!-- Assignment List Table -->
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 rounded-lg shadow-md">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4">Title</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/2">Description Preview</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="assignments_table_body" class="bg-white divide-y divide-gray-200">
+                    <!-- Assignments will be dynamically inserted here -->
+                </tbody>
+            </table>
+        </div>
+        <p id="no_assignments" class="hidden text-center text-gray-500 mt-6">No assignments found for this class. Click "Add New Assignment" to begin.</p>
+    </div>
+
+</div>
+
+<!-- Assignment Modal for Add/Edit -->
+<div id="assignmentModal" class="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto hidden z-50">
+    <div class="flex items-center justify-center min-h-screen">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 p-6 transform transition-all">
+            <h3 id="modalTitle" class="text-xl font-bold text-gray-900 mb-4 border-b pb-2">Add New Assignment</h3>
+            <form id="assignmentForm" onsubmit="handleFormSubmission(event)">
+                <input type="hidden" id="assignmentId">
+                <input type="hidden" id="assignmentClassId">
+
+                <div class="mb-4">
+                    <label for="assignmentTitle" class="block text-sm font-medium text-gray-700">Title</label>
+                    <input type="text" id="assignmentTitle" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div class="mb-4">
+                    <label for="assignmentDescription" class="block text-sm font-medium text-gray-700">Description (Markdown)</label>
+                    <textarea id="assignmentDescription" rows="8" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Use Markdown formatting for the assignment details."></textarea>
+                </div>
+
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" onclick="closeAssignmentModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition duration-150">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition duration-150">
+                        Save Assignment
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    const classSelect = document.getElementById('class_select');
+    const managementArea = document.getElementById('management_area');
+    const tableBody = document.getElementById('assignments_table_body');
+    const noAssignments = document.getElementById('no_assignments');
+    const modal = document.getElementById('assignmentModal');
+    const modalTitle = document.getElementById('modalTitle');
+    
+    // Form fields
+    const form = document.getElementById('assignmentForm');
+    const assignmentIdField = document.getElementById('assignmentId');
+    const assignmentClassIdField = document.getElementById('assignmentClassId');
+    const titleField = document.getElementById('assignmentTitle');
+    const descriptionField = document.getElementById('assignmentDescription');
+
+    // --- Utility Functions ---
+    async function apiCall(method, data) {
+        const response = await fetch('{{ url_for("main.api_assignments_crud") }}', {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        if (!response.ok) {
+            // Using a simple alert since we cannot use the custom flash messages easily in JS context here
+            // You should replace this with a proper custom modal/toast later.
+            alert(`Error: ${result.error || result.message}`); 
+            return null;
+        }
+        return result;
+    }
+
+    // --- UI Functions ---
+    function openAssignmentModal(assignment = null) {
+        // Reset form and set class ID
+        form.reset();
+        assignmentClassIdField.value = classSelect.value;
+        assignmentIdField.value = '';
+
+        if (assignment) {
+            modalTitle.textContent = 'Edit Assignment';
+            assignmentIdField.value = assignment.id;
+            titleField.value = assignment.title;
+            descriptionField.value = assignment.description;
+        } else {
+            modalTitle.textContent = 'Add New Assignment';
+        }
+
+        modal.classList.remove('hidden');
+    }
+
+    function closeAssignmentModal() {
+        modal.classList.add('hidden');
+    }
+
+    // --- CRUD Handlers ---
+
+    async function loadAssignments() {
+        const classId = classSelect.value;
+        tableBody.innerHTML = '';
+        noAssignments.classList.add('hidden');
+        managementArea.classList.add('hidden'); // Hide by default
+
+        if (!classId) return;
+
+        // --- FIX: Show the management area when a class is selected ---
+        managementArea.classList.remove('hidden'); 
+        
+        try {
+            const response = await fetch(`{{ url_for("main.api_assignments_crud") }}?class_id=${classId}`);
+            if (!response.ok) throw new Error('Failed to fetch assignments.');
+            
+            const assignments = await response.json();
+            
+            if (assignments.length === 0) {
+                noAssignments.classList.remove('hidden');
+                return;
+            }
+
+            assignments.forEach(assignment => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50';
+                
+                // Truncate description for table preview
+                const descPreview = assignment.description 
+                    ? (assignment.description.length > 80 
+                        ? assignment.description.substring(0, 77) + '...' 
+                        : assignment.description) 
+                    : 'No description';
+
+                // NOTE: Using JSON.stringify(assignment) to pass the full object data to the edit function
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${assignment.title}</td>
+                    <td class="px-6 py-4 text-sm text-gray-500">${descPreview}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button onclick='openAssignmentModal(${JSON.stringify(assignment)})' class="text-indigo-600 hover:text-indigo-900 mx-2">Edit</button>
+                        <button onclick="deleteAssignment(${assignment.id})" class="text-red-600 hover:text-red-900 mx-2">Delete</button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+
+        } catch (error) {
+            console.error("Error loading assignments:", error);
+            alert("Error loading assignments. Check the console for details.");
+        }
+    }
+    
+    // Updated to call openAssignmentModal directly with assignment object
+    function editAssignment(assignment) {
+        openAssignmentModal(assignment);
+    }
+
+    async function deleteAssignment(id) {
+        // Replace with a custom modal in a finished app
+        if (!confirm('Are you sure you want to delete this assignment?')) return; 
+
+        const result = await apiCall('DELETE', { id: id });
+        if (result) {
+            alert('Assignment deleted successfully!');
+            loadAssignments(); // Reload list
+        }
+    }
+
+    async function handleFormSubmission(event) {
+        event.preventDefault();
+        
+        const id = assignmentIdField.value;
+        const method = id ? 'PUT' : 'POST';
+        
+        const payload = {
+            id: id ? parseInt(id) : null,
+            title: titleField.value,
+            description: descriptionField.value,
+            class_id: parseInt(assignmentClassIdField.value)
+        };
+        
+        const result = await apiCall(method, payload);
+
+        if (result) {
+            closeAssignmentModal();
+            alert(result.message);
+            loadAssignments(); // Reload list
+        }
+    }
+    
+</script>
+{% endblock %}

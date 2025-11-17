@@ -1,0 +1,5 @@
+<ul>
+    {% for assignment in assignments %}
+    <li>{{ assignment.title }} - Due: {{ assignment.due_date }}</li>
+    {% endfor %}
+</ul>

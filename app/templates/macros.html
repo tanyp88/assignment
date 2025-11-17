@@ -1,0 +1,13 @@
+{# templates/macros.html #}
+{% macro post_form(action='', method='POST', class_=none, id=none) %}
+<form
+    action="{{ action }}"
+    method="{{ method }}"
+    {% if class_ %}class="{{ class_ }}"{% endif %}
+    {% if id %}id="{{ id }}"{% endif %}
+ 
+>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {{ caller() }}
+</form>
+{% endmacro %}

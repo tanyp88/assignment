@@ -1,0 +1,382 @@
+#app/tasks.py
+from celery import shared_task
+# CRITICAL FIX: Import the global celery instance from the package's __init__
+#from celery import Celery
+from app import db, celery
+from flask import current_app as flask_app  # Use current_app for Flask app instance
+from app.models import User, Assignment, Submission, Class
+from datetime import datetime, timedelta # New imports for recovery logic
+import logging, time
+
+# Email and utility imports
+import smtplib
+from email.mime.text import MIMEText
+import imaplib
+import email
+import re, os
+# Removed unused import of google.cloud.pubsub_v1 and create_app
+import json # New import for parsing structured JSON output
+#import google.generativeai as genai
+#from google.generativeai import types # New import for configuring response schema
+from google.genai import Client # Corrected import for the Client class
+from google.genai import types
+
+# Configure the logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+from google.genai.errors import APIError # Adjust import path as needed
+
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+
+# Initialize Gemini Client
+# The client automatically uses the GENAI_API_KEY environment variable
+#client = genai.Client()
+# Initialize the Gemini Client
+# Define the new timeout value in seconds (e.g., 120 seconds)
+NEW_TIMEOUT_SECONDS = 180
+if GEMINI_API_KEY:
+    client = Client(api_key=GEMINI_API_KEY)
+    # Set the connection timeout here
+    timeout=NEW_TIMEOUT_SECONDS
+else:
+    logger.error("GEMINI_API_KEY environment variable not set. Grading will fail.")
+
+#flask_app=create_app()     #circular imports resolved
+#celery_app = make_celery(flask_app)
+@celery_app.task(bind=True, max_retries=5, default_retry_delay=60)
+def grade_submission(self, submission_id):
+    grade_submission_nodelay( submission_id)
+    pass
+
+def grade_submission_nodelay( submission_id):
+    """Grades a submission using the Gemini API and updates the database."""
+    
+    #with flask_app.app_context():
+    # Check if client is initialized
+    if not GEMINI_API_KEY or not client:
+      logger.error(f"Cannot grade submission {submission_id}: API client not initialized.")
+      return 
+
+    # Task status messages are critical for debugging
+    logger.warning(f"Starting grade_submission task for submission {submission_id}")
+
+
+    try:
+      # 1. Fetch Submission Data
+      submission = Submission.query.get(submission_id)
+      if not submission:
+          logger.error(f"Submission ID {submission_id} not found.")
+          return
+      else:
+        logger.warning(f"{datetime.now()} Submission ID {submission_id} found.")
+
+      # 2. Define the Prompt and System Instruction
+      system_instruction = (
+          "You are an academic grader. Review the student's submission and assign "
+          "a grade out of 100 and provide constructive feedback. "
+          "You MUST ONLY respond with a JSON object containing the fields: 'grade' (integer) "
+          "and 'feedback' (string). DO NOT include any text outside the JSON block."
+      )
+      
+      prompt = (
+          f"Assignment: {submission.assignment.title}\n"
+          f"Full Grade Scale: 100 points maximum.\n"
+          f"Submission Content:\n---\n{submission.content}\n---"
+      )
+      
+      # 3. Define the Structured Output Schema
+      response_schema = types.Schema(
+          type=types.Type.OBJECT,
+          properties={
+              "grade": types.Schema(type=types.Type.INTEGER, description="The final numerical score out of 100."),
+              "feedback": types.Schema(type=types.Type.STRING, description="Constructive text feedback for the student.")
+          },
+          required=["grade", "feedback"]
+      )
+
+      # 4. Define Generation Configuration as a dictionary (to fix the keyword argument error)
+      generation_config_dict = {
+          "system_instruction": system_instruction,
+          "response_mime_type": "application/json",
+          "response_schema": response_schema
+      }
+
+      logger.warning("Calling Gemini API with prompt:\n" + prompt[:200] + "...")
+      
+      # --- FIX APPLIED: Reverting keyword to 'config' and passing the dictionary ---
+      # This addresses the 'unexpected keyword argument generation_config' error.
+      response = client.models.generate_content(
+          model='gemini-2.5-flash-preview-09-2025',
+          contents=[prompt],
+          config=generation_config_dict # <-- Using 'config' keyword with the dict representation
+      )
+      
+      # 5. Process and Validate Response
+      json_text = response.text.strip()
+      import json
+      try:
+          grading_result = json.loads(json_text)
+          grade = int(grading_result.get('grade'))
+          feedback = grading_result.get('feedback')
+          
+          if grade is None or feedback is None:
+              raise ValueError("JSON response missing 'grade' or 'feedback'.")
+
+      except (json.JSONDecodeError, ValueError) as e:
+          # Handle non-compliant LLM output
+          logger.error(f"LLM returned invalid JSON for submission ID {submission_id}. Response: {json_text}. Error: {e}")
+          raise self.retry(exc=e) # Retry the task on invalid API response
+
+      # 6. Update Database
+      submission.grade = grade
+      submission.feedback = feedback
+      submission.graded_at = datetime.utcnow()
+      db.session.commit()
+      
+      logger.info(f"Graded submission {submission_id}: Grade {grade}")
+      # 7. Send notification (async task)
+      send_async_email(submission.student.email,
+                       SUBJECT=f"Graded submission {submission_id}: Grade {grade}",
+                       info=f"Submission Content:\n---\n{submission.content}\n---\nfeedback：{feedback}"
+                       )
+
+    # --- FIX APPLIED: Using the imported APIError class directly ---
+    # This addresses the 'AttributeError: type object 'Client' has no attribute 'errors'' error.
+    except (APIError, Exception) as exc: 
+      db.session.rollback() # Rollback session on error
+      
+      logger.error(f"Error in grade_submission for ID {submission_id}: {exc}")
+      
+      # Retry logic for transient errors (API failures, DB connection issues)
+      raise self.retry(exc=exc)
+    logger.info(f"Graded submission {submission_id}: Done Successfully")
+
+import smtplib
+from email.message import EmailMessage
+def send_async_email(recipient,SUBJECT="Assignment",info="Assignment received and graded"):
+    '''
+    example task for sending a single email asynchronously.
+    logger.info(f"Sending grade notification email to {recipient}...")
+    # This is where your actual SMTP/email logic would go
+    time.sleep(3)
+    logger.info(f"Email sent to {recipient}.")
+    return True
+
+    # 1. Access required configuration from Flask context
+    config = flask_app.config
+    
+    SMTP_SERVER = config.get("MAIL_SERVER")
+    SMTP_PORT = config.get("MAIL_PORT")
+    SMTP_USERNAME = config.get("MAIL_USERNAME")
+    SMTP_PASSWORD = config.get("MAIL_PASSWORD")
+    SENDER = config.get("MAIL_SENDER_ADDRESS")
+    '''
+    SMTP_SERVER = "mail.cctan.ca"
+    SMTP_PORT =   "587"
+    SMTP_USERNAME = "tanyep@cctan.ca"
+    SMTP_PASSWORD = "Tkx940126!"
+    SENDER = "tanyep@cctan.ca"
+
+    if not all([SMTP_SERVER, SMTP_USERNAME, SENDER]):
+        logger.error(f"Missing MAIL configuration for sending email to {recipient}.")
+        return False
+
+    logger.info(f"Attempting to send email to {recipient} via {SMTP_SERVER}:{SMTP_PORT}...")
+    
+    msg = EmailMessage()
+    msg.set_content(info)
+    msg['Subject'] = SUBJECT
+    msg['From'] = SENDER
+    msg['To'] = recipient
+   
+
+    try:
+        # 2. Establish connection to the SMTP server
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            # Note: For many servers, you need to use STARTTLS for security
+            server.starttls() 
+            
+            # 3. Log in to the server
+            server.login(SMTP_USERNAME, SMTP_PASSWORD)
+            
+            # 4. Send the email
+            server.sendmail(SENDER, [recipient], msg.as_string())
+            
+        logger.info(f"Email successfully sent to {recipient}.")
+        return True
+        
+    except smtplib.SMTPException as e:
+        logger.error(f"Failed to send email to {recipient}. SMTP Error: {e}")
+        # Optionally, raise self.retry() here if the task is bound
+        return False
+    except Exception as e:
+        logger.error(f"An unexpected error occurred while sending email to {recipient}: {e}")
+        return False
+
+@celery_app.task
+def generate_report():
+    """
+    Scheduled task (runs every 30s) that generates a report and acts as a
+    RECOVERY MECHANISM for failed/stuck submissions.
+    """
+    logger.info("Starting generate_report (and recovery check) task")
+    # This task requires the app context, which is handled by ContextTask wrapper
+    
+    # 5 minutes is a reasonable timeout for a grading process.
+    timeout_dt = datetime.utcnow() - timedelta(minutes=5)
+    
+    # Find submissions that have not been graded and are older than 5 minutes
+    # Note: We assume 'submitted_at' exists on the Submission model
+    stuck_submissions = Submission.query.filter(
+        Submission.grade.is_(None),
+        Submission.submitted_at < timeout_dt # The ORM will raise if 'submitted_at' doesn't exist
+    ).all()
+    
+    report_lines = []
+    
+    if stuck_submissions:
+        logger.warning(f"Found {len(stuck_submissions)} pending submissions for recovery. Re-queuing...")
+        for s in stuck_submissions:
+            # Explicitly call grade_submission.delay() to re-queue the task
+            grade_submission.delay(s.id)
+            logger.warning(f"RE-QUEUING GRADING FOR SUBMISSION ID: {s.id}")
+            report_lines.append(f"Student: {s.student.username}, Assignment: {s.assignment_id}, Grade: Pending (RE-QUEUED)")
+    
+    # Generate simple report summary (for logging)
+    all_submissions = Submission.query.all()
+    
+    if not stuck_submissions:
+        for s in all_submissions:
+            grade_status = s.grade if s.grade is not None else "Pending"
+            report_lines.append(f"Student: {s.student.username}, Assignment: {s.assignment_id}, Grade: {grade_status}")
+
+    logger.warning("Submission Report\n" + "\n".join(report_lines))
+
+
+#------------------------------------------------------------------------------------------------------#
+
+
+#------------------------------------------------------------------------------------------------------#
+
+@shared_task(bind=True, max_retries=3)
+def process_email_submission(self):
+    try:
+        with flask_app.app_context():
+            print("[DEBUG] Starting process_email_submission task")
+            # Outlook IMAP settings
+            #IMAP_SERVER = 'outlook.office365.com'
+            IMAP_SERVER = 'mail.cctan.ca'
+            IMAP_PORT = 993
+            #EMAIL_USER = 'myceassignments@outlook.com'
+            EMAIL_USER = 'tanyep@cctan.ca'
+            #EMAIL_PASS = os.environ.get('EMAIL_PASSWORD', 'your_app_password')  # Use app-specific password
+            EMAIL_PASS = os.environ.get('CCTANMAIL_PASSWORD', 'Tkx940126!')  #
+            mail = imaplib.IMAP4_SSL(IMAP_SERVER, IMAP_PORT)
+            print("[DEBUG] Connecting to Outlook IMAP")
+            mail.login(EMAIL_USER, EMAIL_PASS)
+            print("[DEBUG] Logged in to Outlook IMAP")
+            mail.select('INBOX')
+            _, message_numbers = mail.search(None, 'UNSEEN')
+            print(f"[DEBUG] Found {len(message_numbers[0].split())} unseen emails")
+            for num in message_numbers[0].split():
+                _, msg_data = mail.fetch(num, '(RFC822)')
+                email_body = msg_data[0][1]
+                msg = email.message_from_bytes(email_body)
+                subject = email.header.decode_header(msg['Subject'])[0][0]
+                if isinstance(subject, bytes):
+                    subject = subject.decode()
+                sender = msg['From']
+                print(f"[DEBUG] Processing email from {sender} with subject: {subject}")
+
+                # Parse subject with regex
+                match = re.match(r'Assignment ID: (\d+), Class ID: (\d+) - (.+) (\w+)', subject.strip())
+                if not match:
+                    print(f"[ERROR] Invalid subject format: {subject}. Expected: 'Assignment ID: <id>, Class ID: <id> - <name> <id>'")
+                    # Send auto-reply for invalid format
+                    send_reply(sender, "Invalid Submission Format", "Please use the format: Assignment ID: <id>, Class ID: <id> - <name> <id>")
+                    mail.store(num, '+FLAGS', '\\Seen')  # Mark as seen
+                    continue
+
+                assignment_id, class_id, student_name, student_id = match.groups()
+                assignment_id = int(assignment_id)
+                class_id = int(class_id)
+                print(f"[DEBUG] Parsed: Assignment {assignment_id}, Class {class_id}, Student {student_name} {student_id}")
+
+                # Find user by email (sender)
+                user = User.query.filter_by(email=sender).first()
+                if not user or user.student_id != student_id:
+                    print(f"[ERROR] No matching user found for email: {sender} or student ID mismatch")
+                    send_reply(sender, "Invalid Student ID", "Your student ID does not match your registered email. Please check and resubmit.")
+                    mail.store(num, '+FLAGS', '\\Seen')
+                    continue
+
+                # Validate assignment and enrollment
+                assignment = Assignment.query.get(assignment_id)
+                if not assignment or assignment.class_id != class_id:
+                    print(f"[ERROR] Invalid assignment {assignment_id} or class {class_id}")
+                    send_reply(sender, "Invalid Assignment", "The assignment or class ID is invalid. Please check and resubmit.")
+                    mail.store(num, '+FLAGS', '\\Seen')
+                    continue
+
+                # Check enrollment (assuming User has a relationship to classes)
+                if user not in assignment.course.students:
+                    print(f"[ERROR] User {user.student_id} not enrolled in class {class_id}")
+                    send_reply(sender, "Not Enrolled", "You are not enrolled in this class. Contact the instructor.")
+                    mail.store(num, '+FLAGS', '\\Seen')
+                    continue
+
+                # Extract content from body (plain text priority)
+                content = ''
+                if msg.is_multipart():
+                    for part in msg.walk():
+                        if part.get_content_type() == 'text/plain':
+                            content = part.get_payload(decode=True).decode('utf-8', errors='ignore')
+                            break
+                else:
+                    content = msg.get_payload(decode=True).decode('utf-8', errors='ignore')
+
+                if not content.strip():
+                    print(f"[ERROR] No content in email body")
+                    send_reply(sender, "No Content", "Your email body is empty. Please include your submission text.")
+                    mail.store(num, '+FLAGS', '\\Seen')
+                    continue
+
+                # Create submission
+                submission = Submission(
+                    student_id=user.id,
+                    assignment_id=assignment_id,
+                    content=content.strip()
+                )
+                db.session.add(submission)
+                db.session.commit()
+                print(f"[INFO] Submission created: {submission.id} for user {user.student_id}")
+
+                # Trigger grading
+                grade_submission.delay(submission.id)
+
+                # Send confirmation reply
+                send_reply(sender, "Submission Received", f"Your submission for Assignment {assignment.title} (ID: {assignment_id}) has been received and queued for grading. Submission ID: {submission.id}")
+
+                # Mark as seen
+                mail.store(num, '+FLAGS', '\\Seen')
+
+            mail.logout()
+            print("[INFO] Completed process_email_submission task")
+    except Exception as e:
+        print(f"[ERROR] Error in process_email_submission: {str(e)}")
+        self.retry(countdown=60, exc=e)
+
+# Helper function to send reply (using SMTP)
+def send_reply(to_email, subject, body):
+    try:
+        msg = MIMEText(body)
+        msg['Subject'] = subject
+        msg['From'] = 'myceassignments@outlook.com'
+        msg['To'] = to_email
+        with smtplib.SMTP('outlook.office365.com', 587) as server:
+            server.starttls()
+            server.login('myceassignments@outlook.com', os.environ.get('EMAIL_PASSWORD', 'your_app_password'))
+            server.sendmail('myceassignments@outlook.com', to_email, msg.as_string())
+        print(f"[INFO] Reply sent to {to_email}")
+    except Exception as e:
+        print(f"[ERROR] Failed to send reply to {to_email}: {str(e)}")

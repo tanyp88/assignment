@@ -1,0 +1,9 @@
+from app import create_app
+
+# The 'application' or 'app' variable is what most WSGI servers 
+# (like Gunicorn) look for by default.
+app = create_app()
+
+# NOTE: If you are also using a separate file for your Celery worker 
+# (e.g., celery_worker.py), that file will also call create_app()
+# to get the configured application and bind the celery object.

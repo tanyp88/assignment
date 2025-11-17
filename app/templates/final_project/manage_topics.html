@@ -1,0 +1,107 @@
+<!-- templates/final_project/manage_topics.html -->
+{% extends "base.html" %}
+{% block title %}管理题目{% endblock %}
+
+{% block content %}
+<h3 class="mb-4">管理题目 - {{ cls.name }}</h3>
+
+<div class="card">
+    <div class="card-body">
+        <h5>当前题目</h5>
+        <ul class="list-group mb-4">
+        
+        {% for topic in topics %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <div class="flex-grow-1">
+                    <div class="d-flex align-items-center gap-3">
+                        <strong>{{ loop.index }}. {{ topic.topic_title }}</strong>
+                        <span class="badge bg-{{ 'danger' if topic.is_full() else 'success' }} rounded-pill">
+                            {{ topic.current_students() }} / {{ topic.max_students }}
+                        </span>
+                    </div>
+                    {% if topic.topic_description %}
+                    <p class="text-muted mb-0 mt-1 small">
+                        {{ topic.topic_description|truncate(60) }}
+                    </p>
+                    {% endif %}
+                </div>
+
+                <div class="btn-group" role="group">
+                    <!-- 修改按钮 -->
+                    <a href="{{ url_for('final_project.edit_topic', topic_id=topic.id) }}"
+                       class="btn btn-sm btn-warning">
+                        修改
+                    </a>
+                    <!-- 查看提交按钮 -->
+                    <a href="{{ url_for('final_project.view_submissions', topic_id=topic.id) }}"
+                       class="btn btn-sm btn-info">
+                        查看提交
+                    </a>
+                    <!-- 删除按钮 -->
+                    <form method="post" class="d-inline" onsubmit="return confirm('确定删除？')">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="action" value="delete_{{ topic.id }}">
+                        <button type="submit" class="btn btn-sm btn-danger">删除</button>
+                    </form>
+                </div>
+            </li>
+        {% endfor %}
+        </ul>
+
+        <!-- 添加新题目表单 -->
+        <h5>添加新题目</h5>
+        <form method="post" id="add-topic-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="add">
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <input type="text" name="title" class="form-control" placeholder="题目名称" required>
+                </div>
+                <div class="col-md-3">
+                    <input type="number" name="max_students" class="form-control" value="5" min="1">
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-success w-100">添加</button>
+                </div>
+            </div>
+            <textarea name="description" id="markdown-input" class="form-control" rows="4"
+                      placeholder="支持 Markdown：**粗体**、*斜体*、代码块等..."></textarea>
+
+            <!-- Markdown 实时预览 -->
+            <div class="mt-3">
+                <label class="form-label text-primary">实时预览</label>
+                <div id="markdown-preview" class="border rounded p-3 bg-light"
+                     style="min-height: 200px; max-height: 500px; overflow-y: auto;">
+                    <em class="text-muted">输入 Markdown，实时预览...</em>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="mt-3">
+    <a href="{{ url_for('final_project.final_project_dashboard', class_id=cls.id) }}"
+       class="btn btn-secondary">返回仪表盘</a>
+</div>
+
+
+
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const input = document.getElementById('markdown-input');
+    const preview = document.getElementById('markdown-preview');
+
+    function render() {
+        const html = marked.parse(input.value || '');
+        preview.innerHTML = html || '<em class="text-muted">输入 Markdown，实时预览...</em>';
+    }
+    input.addEventListener('input', render);
+    render();
+});
+</script>
+<style>
+#markdown-preview pre { background: #f8f9fa; padding: 10px; border-radius: 6px; }
+#markdown-preview code { background: #e9ecef; padding: 2px 6px; border-radius: 3px; }
+</style>
+{% endblock %}

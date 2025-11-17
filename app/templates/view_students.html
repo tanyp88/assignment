@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Students – {{ class_obj.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>Students in {{ class_obj.name }}</h2>
+            <p class="text-muted">{{ students|length }} enrolled</p>
+        </div>
+        <a href="{{ url_for('main.student_dashboard') }}" class="btn btn-secondary">
+            Back to Dashboard
+        </a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-striped table-hover align-middle">
+            <thead class="table-primary">
+                <tr>
+                    <th>Name</th>
+                    <th>Student ID</th>
+                    {#<th>WeChat ID</th>#}
+                    <th class="text-center">Attendance</th>
+                    <th class="text-center">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in students %}
+                <tr>
+                    <td><strong>{{ s.username }}</strong></td>
+                    <td>{{ s.student_id }}</td>
+                    {#<td>
+                        {% if s.openid %}
+                        <code class="small">{{ s.openid }}</code>
+                        {% else %}
+                        <span class="text-muted">Not bound</span>
+                        {% endif %}
+                    </td>#}
+                    <td class="text-center">
+                        {% if s.total_days %}
+                            <strong>{{ s.present_days }}</strong> / {{ s.total_days }}
+                            <small class="text-muted">
+                                ({{ "%.0f"|format((s.present_days / s.total_days)*100) }}%)
+                            </small>
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        <a href="{{ url_for('main.student_assignment_detail',
+                                            class_id=class_obj.id,
+                                            student_id=s.id) }}"
+                           class="btn btn-outline-primary btn-sm">
+                            Detail
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

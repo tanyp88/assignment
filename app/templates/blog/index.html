@@ -1,0 +1,20 @@
+{% extends "blog/base.html" %}
+{% block blog_content %}
+<h1>My Courses</h1>
+{% if courses %}
+<div class="row">
+    {% for c in courses %}
+    <div class="col-md-6 mb-3">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">{{ c.title }}</h5>
+                <a href="{{ url_for('blog.course_detail', course_id=c.id) }}" class="btn btn-primary">View</a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<p class="text-muted">No courses available.</p>
+{% endif %}
+{% endblock %}

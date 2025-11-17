@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Create Announcement{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <h1>Create Announcement</h1>
+
+    <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="mb-3">
+            <label class="form-label">Title</label>
+            <input type="text" name="title" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Content</label>
+            <textarea name="content" class="form-control" rows="5" required></textarea>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Class (optional - leave blank for global)</label>
+            <select name="class_id" class="form-control">
+                <option value="">Global Announcement</option>
+                {% for cls in classes %}
+                <option value="{{ cls.id }}">{{ cls.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Create</button>
+        <a href="{{ url_for('main.announcement_index') }}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %}

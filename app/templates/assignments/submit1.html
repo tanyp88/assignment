@@ -1,0 +1,93 @@
+<!-- ./assignment_app/app/templates/assignments/submit.html -->
+{% extends "base.html" %}
+{% block title %}Submit Assignment{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    <h2>Submit Assignment: {{ assignment.title }}</h2>
+    <p id="assignment-description"> Assignment: {{ assignment.description}}  </p>
+    <form method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="mb-3">
+            <label for="content" class="form-label">Content</label>
+            <textarea 
+                rows="20" 
+                class="form-control monospace-content" 
+                id="content" 
+                name="content"
+            >{{ initial_content }}</textarea>
+        </div>
+        <label for="markdown-preview" class="form-label">preview</label>
+        <div id="markdown-preview" class="p-3 border">
+        </div>
+        <div class="alert alert-info small">
+            <strong>Allowed:</strong> .py,.c,.cpp,.ipynb,.txt,.md,.pdf,.docx,.png,.jpg,.jpeg,.webp
+            <br><em>DOCX will be converted to PDF automatically.</em>
+        </div>
+        <div class="mb-3">
+            <label for="file" class="form-label">上传文件（支持代码 + 文档）</label>
+            <input type="file" 
+                name="file" 
+                id="file"
+                accept=".py,.c,.cpp,.ipynb,.txt,.md,.pdf,.docx,.png,.jpg,.jpeg,.webp"
+                class="form-control">
+            <small class="text-muted">
+                支持: <code>.py</code> <code>.c</code> <code>.cpp</code> <code>.ipynb</code> 
+                <code>.md</code> <code>.pdf</code> <code>.docx</code> <code>图片</code>
+            </small>
+        </div>
+        
+        <button type="submit" class="btn btn-primary">Submit</button>
+    </form>
+</div>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/showdown/2.1.0/showdown.min.js"></script>
+<script>
+    // 1. Get the elements
+    const csrf = getCsrfToken();
+    const textarea = document.getElementById('content');
+    const  preview = document.getElementById('markdown-preview');
+
+    // 2. Initialize the converter
+    const converter = new showdown.Converter();
+
+    // 3. Define the update function
+    function updatePreview() {
+        const markdownText = textarea.value;
+        const html = converter.makeHtml(markdownText);
+        preview.innerHTML = html;
+    }
+
+    // 4. Run the update when the user types
+    textarea.addEventListener('input', updatePreview);
+
+    // Initial render on load    
+    updatePreview();
+
+    // New element to select
+    const descriptionElement = document.getElementById('assignment-description');
+
+    // Function to update the description
+    function updateDescription() {
+        // Get the raw text (which includes the label "Assignment: ")
+        const rawText = descriptionElement.textContent;
+        
+        // Find the index of the colon and slice to get only the Markdown content
+        const markdownText = rawText.substring(rawText.indexOf(':') + 1).trim();
+        
+        // Convert the Markdown to HTML
+        const html = converter.makeHtml(markdownText);
+        
+        // Update the innerHTML of the paragraph, keeping the "Assignment:" label
+        descriptionElement.innerHTML = "Assignment: " + html;
+    }
+
+    // Run on load
+    updateDescription();
+
+</script>
+
+
+
+
+{% endblock %}`

@@ -1,0 +1,323 @@
+{# attendance/scan.html  for student#}
+{% extends "base.html" %}
+{% block title %}Scan to Check In{% endblock %}
+{% block content %}
+<div class="container text-center mt-5">
+    <h3>Check In: {{ class_name or 'Scan QR Code' }}</h3>
+    <!-- Increased size to 450px by 450px -->
+    <div id="scanner-container" style="width:450px;height:450px;margin:20px auto;border:2px dashed #007bff;"></div>
+    <button id="start-scan" class="btn btn-primary btn-lg">Start Camera</button>
+    <p id="status" class="mt-3"></p>
+</div>
+
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script> 
+<script>
+    const classId = {{ class_id | tojson }};
+    const checkinStatusUrl = `/zuoye/attendance/checkin_status/${classId}`;
+    let alreadyCheckedIn = false;
+
+    // --- CHECK STATUS ON LOAD ---
+    async function checkExistingCheckin() {
+        try {
+            const resp = await fetch(checkinStatusUrl);
+            const data = await resp.json();
+            if (data.checked_in) {
+                alreadyCheckedIn = true;
+                document.getElementById('status').innerHTML = `
+                    <div class="alert alert-info">
+                        <strong>You have already checked in today.</strong>
+                    </div>`;
+                document.getElementById('start-scan').disabled = true;
+                document.getElementById('start-scan').textContent = "Already Checked In";
+            }
+        } catch (e) {
+            console.error("Failed to check status:", e);
+        }
+    }
+
+
+    const csrf = getCsrfToken();
+    const scanner = new Html5Qrcode("scanner-container");
+    const status = document.getElementById('status');
+    const btn = document.getElementById('start-scan');
+    const REDIRECT_DELAY_MS = 1500; // 1.5 seconds delay before redirecting
+
+    function extractToken1(raw) {
+        // Look for the last segment which should be the UUID token.
+        const segments = raw.split('/');
+        const token = segments.pop() || segments.pop(); // Handle trailing slash
+        
+        // Basic check to see if it looks like a UUID (length 36)
+        if (token && token.length === 36 && token.includes('-')) {
+            return token;
+        }
+        return null;
+    }
+    
+    // NEW & IMPROVED: Handles both path-based and query-string-based tokens
+    function extractToken(raw) {
+        let token = null;
+
+        try {
+            // 1. Try to extract the token using URL and URLSearchParams (for query strings)
+            const url = new URL(raw);
+            token = url.searchParams.get('token');
+            
+            if (token) {
+                // Check if the extracted parameter is a valid UUID before returning it
+                if (token.length === 36 && token.includes('-')) {
+                    return token;
+                }
+            }
+            
+        } catch (e) {
+            // If 'raw' wasn't a valid URL, the new URL() constructor will fail. 
+            // This is fine, we fall back to the original path-splitting logic below.
+            // console.error("URL parsing failed, falling back to path logic:", e); 
+        }
+        
+        // 2. Fallback: Use the original path-splitting logic 
+        // (for URLs like /attendance/checkin/a753cb49-...)
+        const segments = raw.split('/');
+        const pathToken = segments.pop() || segments.pop(); // Handle trailing slash
+        
+        // Final validation check (applies to both attempts)
+        if (pathToken && pathToken.length === 36 && pathToken.includes('-')) {
+            return pathToken;
+        }
+        
+        return null;
+    }
+
+    // UPDATED: checkin function now accepts latitude and longitude
+    function checkin(token, latitude, longitude) {
+        // Construct the payload with location data
+        const csrf_token = getCsrfToken(); // Re-fetch the token for safety
+
+        const payload = {
+            token, 
+            student_id: "{{ current_user.student_id }}",
+            latitude,
+            longitude
+        };
+
+        fetch('/zuoye/attendance/checkin', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json',
+                      // --- ADD THIS LINE ---
+                      'X-CSRFToken': csrf_token // Send the token in the required header
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(r => {
+            if (!r.ok) {
+                // Read text response for detailed error if available
+                return r.text().then(text => { throw new Error(`HTTP ${r.status}: ${text}`); });
+            }
+            return r.json();
+        })
+        .then(data => {
+            if (!data || typeof data !== 'object') {
+                throw new Error("Invalid response from server");
+            }
+            
+            const color = data.success ? 'green' : 'red';
+            
+            // Display the final status message
+            status.innerHTML = `<strong style="color:${color}">${data.message}</strong>`;
+            
+            if (data.message.includes('already checked in') || data.message.includes('Already')) {
+                document.getElementById('start-scan').disabled = true;
+                document.getElementById('start-scan').textContent = "Already Checked In";
+            }
+
+            // --- REDIRECTION LOGIC ---
+            const dashboardUrl = '{{ url_for("main.student_dashboard") }}'; 
+            let finalRedirectUrl = null;
+
+            if (data.redirect_url) {
+                finalRedirectUrl = data.redirect_url;
+            } else if (data.success && dashboardUrl) {
+                finalRedirectUrl = dashboardUrl;
+            }
+
+            if (finalRedirectUrl) {
+                setTimeout(() => {
+                    window.location.href = finalRedirectUrl;
+                }, REDIRECT_DELAY_MS);
+                return;
+            }
+            // ---------------------------
+            
+            // Re-enable the button if it was an explicit failure 
+            if (!data.success) {
+                btn.disabled = false;
+                btn.textContent = "Try Scanning Again";
+            }
+        })
+        .catch(err => {
+            console.error("Checkin failed:", err);
+            status.innerHTML = `<strong style="color:red">Error: ${err.message}</strong>`;
+            btn.disabled = false;
+            btn.textContent = "Start Camera";
+        });
+    }
+
+    // Function to get location and then trigger checkin
+    function getLocationAndCheckin(token) {
+        status.innerHTML = `<strong style="color:orange">Acquiring final location coordinates...</strong>`;
+        
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(
+                // Success callback
+                (position) => {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    status.innerHTML = `<strong style="color:blue">Location acquired. Sending check-in request...</strong>`;
+                    checkin(token, lat, lon);
+                },
+                // Error callback
+                (error) => {
+                    // Geolocation failed on the second, final attempt
+                    btn.disabled = false;
+                    let message;
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED:
+                            message = "Geolocation failed: Permission required.";
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            message = "Geolocation failed: Location information is unavailable.";
+                            break;
+                        case error.TIMEOUT:
+                            message = "Geolocation failed: Timed out while waiting for coordinates.";
+                            break;
+                        default:
+                            message = `Geolocation failed: Error Code ${error.code}.`;
+                    }
+                    status.innerHTML = `<strong style="color:red">${message} Cannot check in.</strong>`;
+                    btn.textContent = "Start Camera";
+                },
+                // Options (longer timeout for actual data acquisition)
+                {
+                    enableHighAccuracy: true, 
+                    timeout: 5000, 
+                    maximumAge: 0    
+                }
+            );
+        } else {
+            // Should be caught in the initial flow, but as a fallback
+            btn.disabled = false;
+            status.innerHTML = `<strong style="color:red">Geolocation is not supported by your device. Cannot check in.</strong>`;
+            btn.textContent = "Start Camera";
+        }
+    }
+    
+    // --- NEW FLOW FUNCTION ---
+    function startCameraAndLocationFlow() {
+        btn.disabled = true;
+        status.textContent = "Requesting location permission...";
+
+        if (!("geolocation" in navigator)) {
+            status.innerHTML = `<strong style="color:red">Geolocation is not supported by your device. Cannot check in.</strong>`;
+            btn.disabled = false;
+            return;
+        }
+
+        // 1. Initiate a quick check for geolocation permission (this triggers the browser prompt)
+        navigator.geolocation.getCurrentPosition(
+            // Geolocation Success (Permission is granted or already set)
+            (position) => {
+                // Permission is ready. Start the camera sequence.
+                startScanner();
+            },
+            // Geolocation Error (Permission Denied, or immediate failure)
+            (error) => {
+                btn.disabled = false;
+                btn.textContent = "Start Camera";
+                let message;
+                switch(error.code) {
+                    case error.PERMISSION_DENIED:
+                        message = "Check-in requires **Location Access**. Please grant permission and try again.";
+                        break;
+                    case error.TIMEOUT:
+                        // If it times out quickly, permission is often granted, but signal is slow.
+                        // We still try to proceed to scanner and let getLocationAndCheckin handle the final timeout.
+                        status.innerHTML = `<strong style="color:orange">Location signal weak. Starting scanner...</strong>`;
+                        startScanner();
+                        return;
+                    default:
+                        message = `Location Error: Code ${error.code}. Cannot proceed.`;
+                }
+                status.innerHTML = `<strong style="color:red">${message}</strong>`;
+            },
+            // Options: very short timeout to primarily check permission state
+            {
+                enableHighAccuracy: true,
+                timeout: 2000, 
+                maximumAge: 60000 
+            }
+        );
+    }
+
+    // Function to start the camera scanner
+    function startScanner() {
+        status.textContent = "Starting camera...";
+        scanner.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: 400 },
+            text => {
+                // --- NEW DEBUG LINE ---
+                // Display the raw, full text read from the QR code on the screen
+                status.innerHTML = `**DEBUG: Raw Data:** ${text}`; 
+                // -----------------------
+
+                const token = extractToken(text);
+                
+                // Stop the scanner immediately upon successful read
+                scanner.stop().then(() => {
+                    if (token) {
+                        // QR is valid, proceed to final location acquisition and checkin
+                        getLocationAndCheckin(token);
+                    } else {
+                        btn.disabled = false;
+                        status.innerHTML = `<strong style="color:red">Invalid QR code. Try again.</strong> <br> **(Raw Data: ${text})**`;
+                        //status.textContent = "Invalid QR code. Try again.";
+                        btn.textContent = "Start Camera";
+                    }
+                }).catch(err => {
+                    console.error("Failed to stop scanner after scan:", err);
+                    if (token) {
+                        getLocationAndCheckin(token);
+                    } else {
+                         btn.disabled = false;
+                         status.innerHTML = `<strong style="color:red">Invalid QR code. Try again.</strong> <br> **(Raw Data: ${text})**`;
+                         //status.textContent = "Invalid QR code. Try again.";
+                         btn.textContent = "Start Camera";
+                    }
+                });
+            },
+            () => { /* log */ }
+        ).catch(e => {
+            status.textContent = "Camera error: Please ensure camera permissions are granted.";
+            console.error("Camera startup failed:", e);
+            btn.disabled = false;
+            btn.textContent = "Start Camera";
+        });
+        // Update status for the user
+        btn.disabled = true;
+        status.textContent = "Scanning…";
+    }
+
+    // --- ON LOAD ---
+    document.addEventListener('DOMContentLoaded', () => {
+        checkExistingCheckin();  // ← CHECK FIRST
+    });
+
+    // --- BUTTON CLICK ---
+    document.getElementById('start-scan').onclick = () => {
+        if (alreadyCheckedIn) return;
+        startCameraAndLocationFlow();
+    };
+
+</script>
+{% endblock %}

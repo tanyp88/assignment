@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="container mt-5">
+  <h2>{{ title }}: {{ assignment.title }}</h2>
+
+  <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="mb-3">
+      <label class="form-label">Title</label>
+      <input type="text" name="title" class="form-control" value="{{ assignment.title }}" required>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Description (Markdown)</label>
+      <textarea name="description" class="form-control" rows="5">{{ assignment.description or '' }}</textarea>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Due Date & Time</label>
+      <input type="datetime-local" name="due_date" class="form-control" value="{{ assignment.due_date.strftime('%Y-%m-%dT%H:%M') }}" required>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Weight</label>
+      <input type="number" step="0.1" min="0.1" name="weight" class="form-control" value="{{ assignment.weight }}" required>
+      <small class="text-muted">Default: 1.0</small>
+    </div>
+
+    <button type="submit" class="btn btn-warning">Update Assignment</button>
+    <a href="{{ url_for('assignments.manage_assignments') }}" class="btn btn-secondary ms-2">Cancel</a>
+  </form>
+</div>
+{% endblock %}

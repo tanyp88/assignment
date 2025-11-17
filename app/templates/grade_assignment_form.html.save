@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Confirm Grading{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-lg border-warning">
+                <div class="card-header bg-warning text-dark">
+                    <h2 class="h4 mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i> Confirm Automatic Grading</h2>
+                </div>
+                <div class="card-body p-4">
+                    <p class="lead">
+                        You are about to trigger the automatic grading process for the assignment:
+                    </p>
+                    <h3 class="text-primary mb-4">"{{ assignment.title }}"</h3>
+
+                    <div class="alert alert-info border-0 bg-light-info" role="alert">
+                        <p class="mb-1">
+                            This action will submit all **unreviewed** submissions (status 'submitted' or 'resubmitted') for this assignment to the grading engine (Celery worker).
+                        </p>
+                        <p class="mb-0 small text-muted">
+                            Grading will happen in the background. Please check the assignment detail page later for updated scores.
+                        </p>
+                    </div>
+
+                    {# The form posts to the 'grade_assignment' route which handles the Celery task dispatch #}
+                    <form method="POST" action="{{ url_for('assignments.grade_assignment', assignment_id=assignment.id) }}" class="mt-4">
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-warning btn-lg">
+                                <i class="bi bi-check-circle me-2"></i> Start Automatic Grading Now
+                            </button>
+                            <a href="{{ url_for('assignments.assignment_detail', assignment_id=assignment.id) }}" class="btn btn-outline-secondary btn-lg">
+                                <i class="bi bi-x-circle me-2"></i> Cancel and Go Back
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

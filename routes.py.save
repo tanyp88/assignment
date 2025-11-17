@@ -1,0 +1,57 @@
+from flask import Blueprint, request, jsonify, current_app
+from . import db
+from .models import Submission, Assignment
+from .tasks import review_submission
+import os
+
+main = Blueprint('main', __name__)
+
+@main.route('/submit', methods=['GET', 'POST'])
+def submit_assignment():
+    if request.method == 'GET':
+        assignments = Assignment.query.all()
+        return render_template('submit.html', assignments=assignments)
+    
+    # POST logic
+    if request.is_json:
+        data = request.get_json() or {}
+        assignment_id = data.get('assignment_id')
+        content = data.get('content')
+    else:
+        assignment_id = request.form.get('assignment_id')
+        content = request.form.get('content')
+        file = request.files.get('file')
+
+    if not assignment_id or not content:
+        return jsonify({'error': 'Missing assignment_id or content'}), 400
+
+    assignment = Assignment.query.get(assignment_id)
+    if not assignment:
+        return jsonify({'error': 'Assignment not found'}), 404
+
+    submission = Submission(
+        assignment_id=assignment_id,
+        student_id=1,  # Hardcoded for testing
+        content=content,
+        file_path=None
+    )
+
+    if 'file' in request.files and file:
+        upload_dir = current_app.config['UPLOAD_FOLDER']
+        os.makedirs(upload_dir, exist_ok=True)
+        file_path = os.path.join(upload_dir, file.filename)
+        file.save(file_path)
+        submission.file_path = file_path
+
+    db.session.add(submission)
+    db.session.commit()
+
+    try:
+        review_submission.delay(submission.id)
+    except Exception as e:
+        current_app.logger.error(f"Failed to queue review task: {e}")
+        db.session.rollback()
+        return jsonify({'error': 'Failed to queue grading task'}), 500
+
+    return jsonify({'message': 'Submission received! Grading in progress...'}), 202
+

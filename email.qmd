@@ -1,0 +1,220 @@
+### 1. Defining a Syntax for Email-Based Assignment Submissions
+
+Based on best practices for email-based assignment submissions (gathered from academic and teaching resources), the syntax should be **simple, structured, and easy for students to remember** while allowing automated parsing by your app. Key principles:
+- **Subject line**: Use it for metadata (e.g., assignment ID, class ID) to avoid parsing the body unnecessarily.
+- **Body**: Plain text for the submission content (e.g., math solutions, code, or essays) to handle non-attachment cases.
+- **Attachments**: Optional for files (e.g., PDFs, images), but prioritize plain text for simplicity.
+- **Validation**: Check for required fields, student enrollment, and assignment existence to prevent spam or invalid submissions.
+- **Error handling**: Send auto-replies for invalid emails.
+
+#### Proposed Email Syntax
+Use this format for emails sent to `myceassignments@outlook.com`:
+
+- **Subject Line** (required, strict format for parsing):
+  ```
+  Assignment ID: <assignment_id>, Class ID: <class_id> - <student_name> <student_id>
+  ```
+  - `<assignment_id>`: Numeric ID of the assignment (e.g., 1 for "Math Assignment 1").
+  - `<class_id>`: Numeric ID of the class (e.g., 2 for "周一11-12(研)结构程序设计(01)致理楼L1-403").
+  - `<student_name>`: Student's full name (e.g., "John Doe").
+  - `<student_id>`: Student's unique ID (e.g., "STU0009").
+  - Example: `Assignment ID: 1, Class ID: 2 - John Doe STU0009`
+
+- **Body** (required, plain text):
+  - The actual submission content (e.g., math solution, code snippet).
+  - Optional: A brief message like "Here is my solution for the equations."
+  - Example:
+    ```
+    Here is my solution for the equations:
+
+    x + y = 2
+    x - y = 4
+
+    Adding the equations: 2x = 6 => x = 3
+    Substituting: 3 + y = 2 => y = -1
+    ```
+
+- **Attachments** (optional):
+  - Files like PDF, DOCX, or images for supporting materials (e.g., scanned work).
+  - The app will extract text from attachments if possible (using libraries like `PyPDF2` or `python-docx`).
+
+- **From Field**:
+  - Student's email address (e.g., `stu0009@school.edu`), which must match a registered user in your database.
+
+#### Why This Syntax?
+- **Parsable**: The subject uses regex (e.g., `r'Assignment ID: (\d+), Class ID: (\d+) - (.+) (\w+)'`) to extract IDs and student details quickly.
+- **User-Friendly**: Students can copy-paste the format; it's concise and mimics web form fields.
+- **Secure**: Validates against database (student enrolled in class? Assignment exists?).
+- **Robust**: Handles plain text bodies; attachments are bonus.
+- From best practices (e.g., from academic guides): Use structured subjects for easy filtering, plain text for accessibility, and confirm receipts to build trust.
+
+If you want to adjust (e.g., add due date checks or multi-part submissions), let me know.
+
+### 2. Setting Up Email Reception at myceassignments@outlook.com
+
+Your app will poll this inbox using IMAP to fetch unseen emails. Assuming:
+- Email: `myceassignments@outlook.com`
+- Password: Use an app-specific password (Outlook requires this for IMAP; generate one in your Microsoft account settings under "Security > Advanced security options > App passwords").
+- Server: `outlook.office365.com` (port 993 for IMAP with SSL).
+
+#### Code Updates for `app/tasks.py`
+Update the `process_email_submission` task to:
+- Connect to Outlook IMAP.
+- Use the proposed subject regex for parsing.
+- Extract sender email to match `User` in DB.
+- Extract content from body (priority) or attachments.
+- Create `Submission` and trigger `grade_submission.delay(submission.id)`.
+- Mark email as seen and send confirmation reply via SMTP.
+
+Updated `process_email_submission` task (replace the existing one in `app/tasks.py`):
+
+```python
+@shared_task(bind=True, max_retries=3)
+def process_email_submission(self):
+    try:
+        with flask_app.app_context():
+            print("[DEBUG] Starting process_email_submission task")
+            # Outlook IMAP settings
+            IMAP_SERVER = 'outlook.office365.com'
+            IMAP_PORT = 993
+            EMAIL_USER = 'myceassignments@outlook.com'
+            EMAIL_PASS = os.environ.get('EMAIL_PASSWORD', 'your_app_password')  # Use app-specific password
+
+            mail = imaplib.IMAP4_SSL(IMAP_SERVER, IMAP_PORT)
+            print("[DEBUG] Connecting to Outlook IMAP")
+            mail.login(EMAIL_USER, EMAIL_PASS)
+            print("[DEBUG] Logged in to Outlook IMAP")
+            mail.select('INBOX')
+            _, message_numbers = mail.search(None, 'UNSEEN')
+            print(f"[DEBUG] Found {len(message_numbers[0].split())} unseen emails")
+            for num in message_numbers[0].split():
+                _, msg_data = mail.fetch(num, '(RFC822)')
+                email_body = msg_data[0][1]
+                msg = email.message_from_bytes(email_body)
+                subject = email.header.decode_header(msg['Subject'])[0][0]
+                if isinstance(subject, bytes):
+                    subject = subject.decode()
+                sender = msg['From']
+                print(f"[DEBUG] Processing email from {sender} with subject: {subject}")
+
+                # Parse subject with regex
+                match = re.match(r'Assignment ID: (\d+), Class ID: (\d+) - (.+) (\w+)', subject.strip())
+                if not match:
+                    print(f"[ERROR] Invalid subject format: {subject}. Expected: 'Assignment ID: <id>, Class ID: <id> - <name> <id>'")
+                    # Send auto-reply for invalid format
+                    send_reply(sender, "Invalid Submission Format", "Please use the format: Assignment ID: <id>, Class ID: <id> - <name> <id>")
+                    mail.store(num, '+FLAGS', '\\Seen')  # Mark as seen
+                    continue
+
+                assignment_id, class_id, student_name, student_id = match.groups()
+                assignment_id = int(assignment_id)
+                class_id = int(class_id)
+                print(f"[DEBUG] Parsed: Assignment {assignment_id}, Class {class_id}, Student {student_name} {student_id}")
+
+                # Find user by email (sender)
+                user = User.query.filter_by(email=sender).first()
+                if not user or user.student_id != student_id:
+                    print(f"[ERROR] No matching user found for email: {sender} or student ID mismatch")
+                    send_reply(sender, "Invalid Student ID", "Your student ID does not match your registered email. Please check and resubmit.")
+                    mail.store(num, '+FLAGS', '\\Seen')
+                    continue
+
+                # Validate assignment and enrollment
+                assignment = Assignment.query.get(assignment_id)
+                if not assignment or assignment.class_id != class_id:
+                    print(f"[ERROR] Invalid assignment {assignment_id} or class {class_id}")
+                    send_reply(sender, "Invalid Assignment", "The assignment or class ID is invalid. Please check and resubmit.")
+                    mail.store(num, '+FLAGS', '\\Seen')
+                    continue
+
+                # Check enrollment (assuming User has a relationship to classes)
+                if user not in assignment.course.students:
+                    print(f"[ERROR] User {user.student_id} not enrolled in class {class_id}")
+                    send_reply(sender, "Not Enrolled", "You are not enrolled in this class. Contact the instructor.")
+                    mail.store(num, '+FLAGS', '\\Seen')
+                    continue
+
+                # Extract content from body (plain text priority)
+                content = ''
+                if msg.is_multipart():
+                    for part in msg.walk():
+                        if part.get_content_type() == 'text/plain':
+                            content = part.get_payload(decode=True).decode('utf-8', errors='ignore')
+                            break
+                else:
+                    content = msg.get_payload(decode=True).decode('utf-8', errors='ignore')
+
+                if not content.strip():
+                    print(f"[ERROR] No content in email body")
+                    send_reply(sender, "No Content", "Your email body is empty. Please include your submission text.")
+                    mail.store(num, '+FLAGS', '\\Seen')
+                    continue
+
+                # Create submission
+                submission = Submission(
+                    student_id=user.id,
+                    assignment_id=assignment_id,
+                    content=content.strip()
+                )
+                db.session.add(submission)
+                db.session.commit()
+                print(f"[INFO] Submission created: {submission.id} for user {user.student_id}")
+
+                # Trigger grading
+                grade_submission.delay(submission.id)
+
+                # Send confirmation reply
+                send_reply(sender, "Submission Received", f"Your submission for Assignment {assignment.title} (ID: {assignment_id}) has been received and queued for grading. Submission ID: {submission.id}")
+
+                # Mark as seen
+                mail.store(num, '+FLAGS', '\\Seen')
+
+            mail.logout()
+            print("[INFO] Completed process_email_submission task")
+    except Exception as e:
+        print(f"[ERROR] Error in process_email_submission: {str(e)}")
+        self.retry(countdown=60, exc=e)
+
+# Helper function to send reply (using SMTP)
+def send_reply(to_email, subject, body):
+    try:
+        msg = MIMEText(body)
+        msg['Subject'] = subject
+        msg['From'] = 'myceassignments@outlook.com'
+        msg['To'] = to_email
+        with smtplib.SMTP('outlook.office365.com', 587) as server:
+            server.starttls()
+            server.login('myceassignments@outlook.com', os.environ.get('EMAIL_PASSWORD', 'your_app_password'))
+            server.sendmail('myceassignments@outlook.com', to_email, msg.as_string())
+        print(f"[INFO] Reply sent to {to_email}")
+    except Exception as e:
+        print(f"[ERROR] Failed to send reply to {to_email}: {str(e)}")
+```
+
+- **Key Changes**:
+  - IMAP: Uses `outlook.office365.com:993` with SSL.
+  - Parsing: Regex on subject for IDs and student details.
+  - Content Extraction: Prioritizes plain text body; ignores attachments for now (can add later with `PyPDF2` if needed).
+  - Validation: Matches sender email to `User`, checks enrollment, assignment existence.
+  - Replies: Auto-sends confirmation or error emails via SMTP (port 587 with TLS).
+  - Mark Seen: Prevents re-processing.
+
+#### Environment Variables
+Add to `.env`:
+```
+EMAIL_PASSWORD=your_outlook_app_password
+```
+
+Generate an app-specific password in your Outlook account (Microsoft Account > Security > App passwords).
+
+#### 3. Integration and Testing
+- **No Further Work Needed**: As you said, the rest (grading, reporting, DB storage) is handled by existing tasks (`grade_submission`, `generate_report`).
+- **Schedule Polling**: Already in `app/__init__.py` (`CELERY_BEAT_SCHEDULE` with 60s interval).
+- **Testing**:
+  1. Restart services: `docker-compose down && docker-compose up --build`.
+  2. Send a test email to `myceassignments@outlook.com` with the proposed subject and body.
+  3. Check `docker logs celery_beat` for scheduling.
+  4. Check `docker logs celery_worker` for processing.
+  5. Verify in DB: New `Submission` record with content, then `grade_submission` runs.
+
+This setup is secure, automated, and follows best practices (structured subjects, confirmation replies, validation). If you need attachment parsing or custom replies, let me know!

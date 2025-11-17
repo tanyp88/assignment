@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% block title %}Scan to Check In{% endblock %}
+{% block content %}
+<div class="container text-center mt-5">
+    <h3>Check In: {{ class_name }}</h3>
+
+    <div id="scanner-container" 
+         style="width:450px;height:450px;margin:20px auto;border:2px dashed #007bff;border-radius:12px;overflow:hidden;position:relative;">
+        <div id="overlay" class="position-absolute top-50 start-50 translate-middle text-white fw-bold" 
+             style="font-size:1.5rem;pointer-events:none;display:none;background:rgba(0,0,0,0.6);padding:12px 20px;border-radius:12px;z-index:10;">
+            Scanning...
+        </div>
+    </div>
+
+    <button id="start-scan" class="btn btn-primary btn-lg px-5">
+        Start Camera
+    </button>
+    <p id="status" class="mt-3"></p>
+</div>
+
+<style>
+    .html5-qrcode-camera-switch,
+    button[title*="camera"] {
+        display: none !important;
+    }
+</style>
+
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+    const classId = {{ class_id | tojson }};
+    const checkinStatusUrl = `/zuoye/attendance/checkin_status/${classId}`;
+    let alreadyCheckedIn = false;
+    let scanner = null;
+
+    async function checkExistingCheckin() {
+        try {
+            const resp = await fetch(checkinStatusUrl);
+            const data = await resp.json();
+            if (data.checked_in) {
+                alreadyCheckedIn = true;
+                document.getElementById('status').innerHTML = `
+                    <div class="alert alert-info">
+                        <strong>You have already checked in today.</strong>
+                    </div>`;
+                document.getElementById('start-scan').disabled = true;
+                document.getElementById('start-scan').textContent = "Already Checked In";
+            }
+        } catch (e) {
+            console.error("Status check failed:", e);
+        }
+    }
+
+    async function startScanner() {
+        const statusEl = document.getElementById('status');
+        const btn = document.getElementById('start-scan');
+        const overlay = document.getElementById('overlay');
+        
+        btn.disabled = true;
+        statusEl.innerHTML = `<small class="text-muted">Opening camera...</small>`;
+
+        try {
+            scanner = new Html5Qrcode("scanner-container");
+
+            await scanner.start(
+                { facingMode: "environment" },
+                {
+                    fps: 10,
+                    qrbox: { width: 350, height: 350 },
+                    focusMode: "continuous"
+                },
+                async (text) => {
+                    overlay.style.display = 'none';
+                    await scanner.stop();
+                    const token = extractToken(text);
+                    if (token) requestLocationAndCheckin(token);
+                    else showError("Invalid QR code");
+                },
+                () => {}
+            );
+
+            overlay.style.display = 'block';
+            statusEl.innerHTML = `<small class="text-primary">Point at QR code...</small>`;
+
+            setTimeout(() => {
+                const switchBtn = document.querySelector('.html5-qrcode-camera-switch');
+                if (switchBtn) switchBtn.style.display = 'none';
+            }, 1000);
+
+        } catch (err) {
+            showError("Camera failed. Please allow access.");
+            btn.disabled = false;
+        }
+    }
+
+    function extractToken(raw) {
+        try {
+            const url = new URL(raw);
+            const token = url.searchParams.get('token');
+            if (token && token.length === 36 && token.includes('-')) return token;
+        } catch (e) {}
+        const segments = raw.split('/');
+        const token = segments.pop() || segments.pop();
+        if (token && token.length === 36 && token.includes('-')) return token;
+        return null;
+    }
+
+    function requestLocationAndCheckin(token) {
+        const statusEl = document.getElementById('status');
+        statusEl.innerHTML = `<small class="text-warning">Getting location...</small>`;
+
+        if (!navigator.geolocation) {
+            showError("Geolocation not supported");
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                statusEl.innerHTML = `<small class="text-info">Sending check-in...</small>`;
+                checkin(token, pos.coords.latitude, pos.coords.longitude);
+            },
+            (err) => {
+                showError("Location denied. Cannot check in.");
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
+    }
+
+    function checkin(token, lat, lon) {
+        fetch('/zuoye/attendance/checkin', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken()
+            },
+            body: JSON.stringify({ token, latitude: lat, longitude: lon })
+        })
+        .then(r => r.ok ? r.json() : r.text().then(t => { throw new Error(t) }))
+        .then(data => {
+            const isNew = data.success && !data.message.includes('already');
+            document.getElementById('status').innerHTML = `
+                <div class="alert alert-${isNew ? 'success' : 'info'}">
+                    <strong>${data.message}</strong>
+                </div>`;
+            if (isNew) {
+                setTimeout(() => location.href = '{{ url_for("main.student_dashboard") }}', 1500);
+            } else {
+                document.getElementById('start-scan').disabled = false;
+            }
+        })
+        .catch(err => showError("Check-in failed: " + err.message));
+    }
+
+    function showError(msg) {
+        document.getElementById('status').innerHTML = `
+            <div class="alert alert-danger">
+                <strong>${msg}</strong>
+            </div>`;
+        document.getElementById('start-scan').disabled = false;
+    }
+
+    document.getElementById('start-scan').onclick = () => {
+        if (alreadyCheckedIn) return;
+        startScanner();
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+        checkExistingCheckin();
+    });
+</script>
+{% endblock %}

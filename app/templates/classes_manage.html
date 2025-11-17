@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Manage Classes{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4 text-3xl font-extrabold text-gray-900 border-b pb-2">
+        <i class="fas fa-school me-2 text-indigo-600"></i> Manage Classes
+    </h1>
+
+    {% if current_user.role != 'teacher' %}
+        <div class="alert alert-danger" role="alert">
+            Access Denied: Only teachers can manage classes.
+        </div>
+    {% else %}
+        <div class="d-flex justify-content-end mb-3">
+            {# Placeholder for the "Create Class" link, which will need a dedicated route later #}
+            <a href="{{ url_for('main.create_class') }}" class="btn btn-success btn-lg shadow-sm">
+            <i class="fas fa-plus me-2"></i> Add New Class
+        </a>
+        </div>
+
+        {% if classes %}
+            <div class="card shadow-lg">
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th scope="col">ID</th>
+                                <th scope="col">Class Name</th>
+                                <th scope="col">Enrolled Students</th>
+                                <th scope="col">Assignments</th>
+                                <th scope="col">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for class_ in classes %}
+                            <tr>
+                                <th scope="row">{{ class_.id }}</th>
+                                <td>
+                                    <strong class="text-primary">{{ class_.name }}</strong>
+                                </td>
+                                <td>{{ class_.students | length }}</td>
+                                <td>{{ class_.assignments | length }}</td>
+                                <td>
+                                    {# This link goes to the existing class detail page for viewing #}
+                                    <a href="{{ url_for('assignments.class_detail', class_id=class_.id) }}" class="btn btn-sm btn-outline-info me-2">
+                                        <i class="fas fa-eye me-1"></i> View Detail
+                                    </a>
+                                    {# FIX: Replaced placeholder with link to assignments.edit_class #}
+                                    <a href="{{ url_for('assignments.edit_class', class_id=class_.id) }}" class="btn btn-sm btn-outline-secondary">
+                                        <i class="fas fa-edit"></i> Edit
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% else %}
+            <div class="alert alert-info text-center" role="alert">
+                There are no classes defined in the system yet.
+            </div>
+        {% endif %}
+    {% endif %}
+</div>
+{% endblock %}

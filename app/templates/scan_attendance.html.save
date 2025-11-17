@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Scan to Check In{% endblock %}
+{% block content %}
+<div class="container text-center mt-5">
+    <h3>Check In: {{ class_name or 'Scan QR Code' }}</h3>
+    <div id="scanner-container" style="width:300px;height:300px;margin:20px auto;border:2px dashed #007bff;"></div>
+    <button id="start-scan" class="btn btn-primary btn-lg">Start Camera</button>
+    <p id="status" class="mt-3"></p>
+</div>
+
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+    const scanner = new Html5Qrcode("scanner-container");
+    const status = document.getElementById('status');
+    const btn = document.getElementById('start-scan');
+
+    function extractToken(raw) {
+        if (raw.startsWith('http')) {
+            return new URL(raw).pathname.split('/').pop();
+        }
+        return raw.split('/').pop();
+    }
+
+    function checkin(token) {
+        fetch('/zuoye/attendance/checkin', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({token, student_id: "{{ current_user.student_id }}"})
+        })
+        .then(r => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.json();
+        })
+        .then(d => {
+            status.innerHTML = `<strong style="color:${d.success?'green':'red'}">${d.message}</strong>`;
+            if (d.success) scanner.stop();
+        })
+        .catch(err => {
+            console.error("Checkin error:", err);
+            status.textContent = "Network error – check console";
+        });
+    }
+
+    btn.onclick = () => {
+        scanner.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: 250 },
+            text => {
+                const token = extractToken(text);
+                if (token && token.length > 30) {
+                    checkin(token);
+                } else {
+                    status.textContent = "Invalid QR code";
+                }
+                scanner.stop();
+            },
+            () => {}
+        ).catch(e => {
+            status.textContent = "Camera error";
+            console.error(e);
+        });
+        btn.disabled = true;
+        status.textContent = "Scanning…";
+    };
+</script>
+{% endblock %}

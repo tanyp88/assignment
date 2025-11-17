@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Class: {{ class_.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <h2 class="mb-4">
+                <i class="fas fa-edit me-2 text-indigo-600"></i> Editing Class: {{ class_.name }}
+            </h2>
+
+            <div class="card shadow-lg border-0 rounded-lg">
+                <div class="card-body p-5">
+                    <form method="POST" action="{{ url_for('assignments.edit_class', class_id=class_.id) }}">
+                       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        
+                        <div class="mb-4">
+                            <label for="name" class="form-label text-lg font-medium">Class Name</label>
+                            <input type="text" class="form-control form-control-lg" id="name" name="name" 
+                                value="{{ class_.name }}" required 
+                                placeholder="e.g., Data Structures and Algorithms">
+                        </div>
+
+                        {# Placeholder for future features like managing instructors or settings #}
+                        <p class="text-muted small mb-4">
+                            You can update the primary name of the course above.
+                        </p>
+
+                        <div class="d-flex justify-content-between pt-3 border-t">
+                            <a href="{{ url_for('main.manage_classes') }}" class="btn btn-outline-secondary">
+                                Cancel & Back to Management
+                            </a>
+                            <button type="submit" class="btn btn-primary btn-lg shadow-sm">
+                                <i class="fas fa-save me-2"></i> Save Changes
+                            </button>
+                        </div>
+                        
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

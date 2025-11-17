@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Create New Class{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-lg border-0 rounded-4">
+                <div class="card-header bg-primary text-white p-3 rounded-top-4">
+                    <h2 class="mb-0 text-center"><i class="fas fa-plus-circle me-2"></i> Create New Class</h2>
+                </div>
+                <div class="card-body p-4">
+                    <form method="POST" action="{{ url_for('main.create_class') }}">
+                        <!-- Flask-WTF fields automatically handle CSRF token -->
+                        {{ form.hidden_tag() }} 
+
+                        <div class="mb-3">
+                            {{ form.name.label(class="form-label fw-bold") }}
+                            {{ form.name(class="form-control form-control-lg", required=true) }}
+                            {% for error in form.name.errors %}
+                                <div class="text-danger small">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="mb-4">
+                            {{ form.description.label(class="form-label fw-bold") }}
+                            {{ form.description(class="form-control", rows="5") }}
+                            {% for error in form.description.errors %}
+                                <div class="text-danger small">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            {{ form.submit(class="btn btn-primary btn-lg shadow") }}
+                            <a href="{{ url_for('main.manage_classes') }}" class="btn btn-outline-secondary">
+                                Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,101 @@
+<!-- templates/final_project/manage_topics.html -->
+{% extends "base.html" %}
+{% block title %}{{ '编辑题目' if topic else '创建期末项目' }}{% endblock %}
+
+{% block content %}
+<h3 class="mb-4">{{ '编辑题目' if topic else '创建期末项目' }} - {{ cls.name }}</h3>
+
+<div class="card">
+    <div class="card-body">
+        <!-- === 添加新题目 + Markdown 预览 === -->
+        <form method="post" id="add-topic-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="add">
+            <div class="mb-3">
+                <label class="form-label">题目名称</label>
+                <input type="text" name="topic_title" class="form-control"
+                       value="{{ topic.topic_title if topic else '' }}" required>
+            </div>
+
+            <!-- Markdown 输入 -->
+            <div class="mb-3">
+                <label class="form-label">题目描述（支持 Markdown）</label>
+                <textarea 
+                    name="topic_description" 
+                    id="markdown-input" 
+                    class="form-control" 
+                    rows="6" 
+                    placeholder="支持 **粗体**、*斜体*、代码块等...">{{ topic.topic_description if topic else '' }}</textarea>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">每题最多人数</label>
+                <input type="number" name="max_students" class="form-control"
+                       value="{{ topic.max_students if topic else 5 }}" min="1">
+            </div>
+            <button type="submit" class="btn btn-success">
+                {{ '保存修改' if topic else '创建项目' }}
+            </button>
+            <a href="{{ url_for('final_project.final_project_dashboard', class_id=cls.id) }}"
+               class="btn btn-secondary">取消</a>  
+        </form>
+    </div>
+</div>
+
+<!-- Markdown 实时预览 -->
+<div class="mt-3">
+    <label class="form-label text-primary">
+        实时预览
+    </label>
+    <div 
+        id="markdown-preview" 
+        class="border rounded p-3 bg-light" 
+        style="min-height: 240px; max-height: 600px; overflow-y: auto; font-size: 0.95rem;"
+    >
+        <em class="text-muted">在此输入 Markdown 内容，实时预览将显示在这里...</em>
+    </div>
+</div>
+
+<div class="mt-3">
+    <a href="{{ url_for('final_project.final_project_dashboard', class_id=cls.id) }}" class="btn btn-secondary">
+        返回仪表盘
+    </a>
+</div>
+
+
+
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const input = document.getElementById('markdown-input');
+    const preview = document.getElementById('markdown-preview');
+
+    function renderMarkdown() {
+        const text = input.value || '';
+        const html = marked.parse(text);
+        preview.innerHTML = html || '<em class="text-muted">在此输入 Markdown 内容，实时预览将显示在这里...</em>';
+    }
+
+    // 初始渲染
+    renderMarkdown();
+
+    // 实时监听
+    input.addEventListener('input', renderMarkdown);
+});
+</script>
+<style>
+#markdown-preview pre {
+    background: #f4f4f4;
+    padding: 10px;
+    border-radius: 4px;
+    overflow-x: auto;
+}
+#markdown-preview code {
+    background: #f4f4f4;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+</style>
+
+{% endblock %}
