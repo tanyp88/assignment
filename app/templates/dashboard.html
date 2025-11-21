@@ -21,13 +21,13 @@
                                     <strong>{{ assignment_count }}</strong> 
                                     Assignment{{ 's' if assignment_count != 1 }} Available
                                 </p>
-                                {% if current_user.role == 'student' %}
+                                {% if user.role == 'student' %}
                                 <a href="{{ url_for('attendance.student_scan', class_id=class_obj.id) }}" class="btn btn-primary btn-sm">签到</a>
                                 <a href="{{ url_for('assignments.class_detail', class_id=class_obj.id) }}" class="btn btn-sm btn-primary">作业</a>
                                 <a href="{{ url_for('final_project.select_topic', class_id=class_obj.id) }}" class="btn btn-primary btn-sm">期末项目</a>
                                 <a href="{{ url_for('final_project.submit_project', class_id=class_obj.id) }}" class="btn btn-primary btn-sm">提交项目</a>
                                 {% endif %}
-                                {% if current_user.role == 'teacher' %}
+                                {% if user.role == 'teacher' %}
                                 <a href="{{ url_for('attendance.attendance_scan', class_id=class_obj.id) }}" class="btn btn-sm btn-success">签到</a>
                                 <a href="{{ url_for('assignments.create_assignment', class_id=class_obj.id) }}" class="btn btn-sm btn-success">作业</a>
                                 <a href="{{ url_for('attendance.generate_qr', class_id=class_obj.id) }}" class="btn btn-success btn-sm"> 扫码 </a>

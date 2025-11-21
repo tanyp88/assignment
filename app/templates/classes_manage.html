@@ -6,7 +6,7 @@
         <i class="fas fa-school me-2 text-indigo-600"></i> Manage Classes
     </h1>
 
-    {% if current_user.role != 'teacher' %}
+    {% if user.role != 'teacher' %}
         <div class="alert alert-danger" role="alert">
             Access Denied: Only teachers can manage classes.
         </div>

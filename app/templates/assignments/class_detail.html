@@ -7,7 +7,7 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>{{ class_obj.name }}</h2>
         <p>{{ class_obj.description or 'No description provided.' }}</p>
-        {# % if current_user.role == 'teacher' % #}
+        {# % if user.role == 'teacher' % #}
             <a href="{{ url_for('assignments.create_assignment', class_id=class_obj.id) }}" 
                class="btn btn-success shadow-sm">
                <i class="bi bi-plus-circle me-1"></i> Create New Assignment
@@ -31,7 +31,7 @@
         <div class="list-group">
             {% for assignment in class_obj.assignments %}
                 {% set submission = submissions.get(assignment.id, none) %}
-                {#<p>Debug: Assignment ID: {{ assignment.id }}, Submission: {{ submission.id if submission else 'None' }}, Student ID: {{ submission.student_id if submission else 'N/A' }}, Current User ID: {{ current_user.id }}</p>#}
+                {#<p>Debug: Assignment ID: {{ assignment.id }}, Submission: {{ submission.id if submission else 'None' }}, Student ID: {{ submission.student_id if submission else 'N/A' }}, Current User ID: {{ user.id }}</p>#}
                 <div class="list-group-item list-group-item-action p-3 mb-3 rounded shadow-sm">
                     <div class="d-flex w-100 justify-content-between align-items-center">
                         <h5 class="mb-1 text-primary">{{ assignment.title }}</h5>
@@ -41,7 +41,7 @@
                     <p class="mb-2">{{ assignment.description | truncate(150, True) }}</p>
 
                     <div class="d-flex justify-content-end align-items-center mt-3">
-                        {% if current_user.role == 'teacher' %}
+                        {% if user.role == 'teacher' %}
                             {# TEACHER VIEW: Link to all submissions and autograde button #}
                             <a href="{{ url_for('assignments.view_submissions', assignment_id=assignment.id) }}" 
                                class="btn btn-sm btn-outline-info me-2">
@@ -57,7 +57,7 @@
                                     <i class="bi bi-robot me-1"></i> Autograde (using AI)
                                 </button>
                             </form>
-                        {% elif current_user.role == 'student' %}
+                        {% elif user.role == 'student' %}
                             {# STUDENT VIEW: Submission Status and Action #}
                             {% if submission %}
                                 
@@ -65,7 +65,7 @@
                                     <span class="badge bg-success me-2 py-2 px-3">
                                         Graded (Score: {{ submission.grade if submission.grade is not none else 'N/A' }})
                                     </span>
-                                    <a href="{{ url_for('assignments.view_submission', assignment_id=assignment.id, student_id=current_user.id) }}" 
+                                    <a href="{{ url_for('assignments.view_submission', assignment_id=assignment.id, student_id=user.id) }}" 
                                        class="btn btn-sm btn-secondary">
                                         <i class="bi bi-eye-fill me-1"></i> View Feedback
                                     </a>

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: "Microsoft YaHei", Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { padding: 20px; background: #f9f9f9; border-radius: 8px; }
+        .score { font-size: 28px; font-weight: bold; color: #e74c3c; }
+        .title { font-size: 20px; color: #2c3e50; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2 class="title">作业批改完成</h2>
+        <p>亲爱的 <strong>{{ submission.student.name }}</strong>：</p>
+        
+        <p>你的作业已批改：</p>
+        <h3>{{ submission.assignment.title }}</h3>
+        <p><strong>提交编号：</strong> {{ submission_id }}</p>
+        <p class="score">得分：{{ grade }} 分</p>
+
+        {% if feedback %}
+        <h4>老师评语：</h4>
+        <p style="background:#fff; padding:15px; border-left:4px solid #3498db;">
+            {{ feedback | replace("\n", "<br>") | safe }}
+        </p>
+        {% endif %}
+
+        <hr>
+        <small>这是一封自动发送邮件，请勿回复。</small>
+    </div>
+</body>
+</html>

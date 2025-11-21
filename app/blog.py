@@ -1,8 +1,8 @@
 from flask import Blueprint, send_from_directory, abort
-from flask_login import login_required, current_user
+#from flask_login import login_required, current_user
 import os, yaml
 from app.models import User, Class, enrolled_classes
-from app import db, logger
+from app import db, logger, login_required, get_current_user
 
 
 blog = Blueprint('blog', __name__, url_prefix='/zuoye/blog')
@@ -31,11 +31,11 @@ def user_can_access_course(course_id):
         return False
     class_id = course['class_id']
 
-    if current_user.role == 'teacher':
-        return Class.query.filter_by(id=class_id, teacher_id=current_user.id).first() is not None
+    if get_current_user().role == 'teacher':
+        return Class.query.filter_by(id=class_id, teacher_id=get_current_user().id).first() is not None
     else:
-        #return current_user.enrolled_classes.filter_by(id=class_id).first() is not None
-        return any(cls.id == class_id for cls in current_user.enrolled_classes)
+        #return get_current_user().enrolled_classes.filter_by(id=class_id).first() is not None
+        return any(cls.id == class_id for cls in get_current_user().enrolled_classes)
 
 @blog.route('/')
 @login_required

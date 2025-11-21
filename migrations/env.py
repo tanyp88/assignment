@@ -1,9 +1,11 @@
 import logging
 from logging.config import fileConfig
-
 from flask import current_app
-
 from alembic import context
+#import alembic.ddl.mariadb  # 关键！加上这行
+
+import os
+os.environ['ALEMBIC_DDL_MYSQL_DIALECT'] = 'mariadb'  # 核弹
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

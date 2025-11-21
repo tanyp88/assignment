@@ -7,7 +7,7 @@
         <i class="fas fa-school me-2 text-indigo-600"></i> Manage Classes
     </h1>
 
-    {% if current_user.role != 'teacher' %}
+    {% if user.role != 'teacher' %}
         <div class="alert alert-danger">Access Denied: Only teachers can manage classes.</div>
     {% else %}
         <div class="d-flex justify-content-end mb-3 gap-2">
@@ -20,18 +20,32 @@
             </a>
         </div>
         
-<!-- QUOTA BANNER -->
-<div id="quota-banner" style="background:#ffebee; color:#c62828; padding:12px; text-align:center; font-family:Arial; display:none; margin:15px 0; border-radius:6px; border:1px solid #ffcdd2;">
-  <div style="font-weight:bold; font-size:1.1em;">
-    Grading Paused: Daily quota reached
-  </div>
-  <div style="margin-top:8px; font-size:1.3em; font-weight:bold;">
-    Resumes in <span id="countdown">00:00:00</span>
-  </div>
-  <div style="font-size:0.9em; margin-top:6px; color:#8b1a1a;">
-    Next reset: <span id="reset-time"></span>
-  </div>
-</div>
+        <!-- QUOTA BANNER -->
+        <div id="quota-banner" style="background:#ffebee; color:#c62828; padding:12px; text-align:center; font-family:Arial; display:none; margin:15px 0; border-radius:6px; border:1px solid #ffcdd2;">
+        <div style="font-weight:bold; font-size:1.1em;">
+            Grading Paused: Daily quota reached
+        </div>
+        <div style="margin-top:8px; font-size:1.3em; font-weight:bold;">
+            Resumes in <span id="countdown">00:00:00</span>
+        </div>
+        <div style="font-size:0.9em; margin-top:6px; color:#8b1a1a;">
+            Next reset: <span id="reset-time"></span>
+        </div>
+        </div>
+
+        <div class="card-body d-flex align-items-center justify-content-between">
+            
+            <h5 class="mb-0 mx-3">系统维护</h5>
+            
+            <p class="mb-0 mx-3">当前未激活账号：{{ unverified_count }} 个</p>
+            
+            <a href="{{ url_for('main.cleanup_zombies') }}" 
+            class="btn btn-danger btn-sm mx-3"
+            onclick="return confirm('确定要清理7天前未激活的账号吗？此操作不可撤销！')">
+                清理7天前未激活的僵尸账号
+            </a>
+            
+        </div>
 
         {% if classes %}
             <div class="card shadow-lg">

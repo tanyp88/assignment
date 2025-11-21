@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import g, Flask, session, redirect, url_for, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_login import LoginManager
@@ -10,7 +10,10 @@ import os, sys, redis
 import logging
 from dotenv import load_dotenv
 from app.utils.quota_lock import clear_quota_lock  # Your lock file
-load_dotenv()
+from werkzeug.middleware.proxy_fix import ProxyFix
+
+
+
 
 #logging.basicConfig(level=logging.DEBUG)
 #logger = logging.getLogger(__name__)
@@ -29,9 +32,42 @@ logger = logging.getLogger(__name__)
 # --- GLOBALS ---
 db = SQLAlchemy()
 migrate = Migrate()
-login = LoginManager()
+login_manager = LoginManager()
 mail = Mail()
 csrf = CSRFProtect()
+
+def get_current_user():
+    user_id = session.get('user_id')
+    if not user_id:
+        return None
+    try:
+        from app.models import User
+        user = User.query.get(int(user_id))
+        if user and user.is_active:
+            return user
+        return None
+    except:
+        return None
+
+def login_required(func):
+    def wrapper(*args, **kwargs):
+        # 白名单：这些路由永远不拦！
+        if request.endpoint in {'main.login', 'main.logout', 'main.index', 'static'}:
+            return func(*args, **kwargs)
+
+        if not session.get('user_id'):
+            return redirect(url_for('main.login'))
+        # 手动加载用户到 g
+        if not hasattr(g, 'user'):
+            from app.models import User
+            g.user = User.query.get(session['user_id'])
+            if not g.user:
+                session.clear()
+                return redirect(url_for('main.login'))
+        return func(*args, **kwargs)
+    wrapper.__name__ = func.__name__
+    return wrapper
+
 
 #celery_app = None
 # 1. Define the Celery instance as a global singleton
@@ -93,6 +129,16 @@ def nl2br(value):
     # to tell Jinja2 that the output is safe to render.
     return Markup(Markup.escape(value).replace('\n', '<br>\n'))
 
+def is_logged_in():
+    if session.get('user_id'):
+        return True
+    try:
+        user = current_user._get_current_object()
+        return getattr(user, 'is_authenticated', False) is True
+    except:
+        return False
+
+
 # 2. Function to apply the filter to the Jinja environment
 def register_jinja_filters(app):
     """
@@ -101,10 +147,20 @@ def register_jinja_filters(app):
     # This line registers the Python function 'nl2br' as a filter named 'nl2br' 
     # that can be used in your templates like {{ text | nl2br }}.
     app.jinja_env.filters['nl2br'] = nl2br
+
+def register_jinja_globals(app):
+    """Registers custom functions with the application's Jinja environment."""
     
+    # Register is_logged_in as a GLOBAL function
+    app.jinja_env.globals['is_logged_in'] = is_logged_in    
+
+
+
+  
 def create_app():
     app = Flask(__name__)
     register_jinja_filters(app)
+    register_jinja_globals(app)
 
     # FIX: Set SECRET_KEY to enable session usage (required for flash messages)
     # This key is crucial for CSRF protection used by Flask-WTF
@@ -119,16 +175,25 @@ def create_app():
     # Initialize extensions
     db.init_app(app)
     migrate.init_app(app, db)
-    login.init_app(app)
+    login_manager.init_app(app)
     mail.init_app(app)
     
     # Configure Flask-Login
-    login.login_view = 'main.login' 
-    @login.user_loader
-    def load_user(user_id):
-        from app.models import User
-        return db.session.get(User, int(user_id))
+    login_manager.login_view = 'main.login' 
+    login_manager.login_message = '请先登录'
+    login_manager.login_message_category = 'warning'
     
+    # 3. DEFINE AND REGISTER the context processor inside the factory
+    #    This code now runs *after* 'app' is created.
+    @app.context_processor
+    def inject_user():
+        # Note: If g.user is not yet defined (e.g., if no @before_request 
+        # is run yet), this will fail. A safer check is often needed.
+        return dict(user=g.user if hasattr(g, 'user') else None)
+        # OR, relying on Flask-Login:
+        # from flask_login import current_user
+        # return dict(user=current_user)
+        
     # Initialize Celery
     # This call configures the GLOBAL 'celery' instance defined above.
     celery = make_celery(app)
@@ -177,9 +242,23 @@ def create_app():
     csrf.init_app(app)
     
     # ADD THIS LINE
+        # 2. Configure Flask Mail settings (These must be set before or during initialization)
+    app.config['MAIL_SERVER'] = 'mail.cctan.ca'
+    app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT'))
+    app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS') == 'True'
+    app.config['MAIL_USE_SSL'] = os.environ.get('MAIL_USE_SSL') == 'True'
+    app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
+    app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
+    app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER')
+    mail.init_app(app) # Link Mail to the configured app
+
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_host=1, x_proto=1, x_prefix=1)
     
+    #from app import loaders # <--- This is where the user_loader should be
 
     return app
+
+
 
 # Remove the 'if __name__ == '__main__': app.run()' block from __init__.py 
 # since you are using run_flask.py and gunicorn.

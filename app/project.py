@@ -1,9 +1,9 @@
 from datetime import datetime
 from flask import Blueprint, send_from_directory, abort, render_template, request, redirect, url_for, flash, jsonify
-from flask_login import login_required, current_user
+#from flask_login import login_required, current_user
 import os, yaml, mimetypes
 from app.models import User, Class, ProjectTopic, TopicSelection, ProjectSubmission
-from app import db, logger
+from app import db, logger, login_required, get_current_user
 from werkzeug.utils import secure_filename
 
 project_bp = Blueprint('final_project', __name__, url_prefix='/zuoye/final_project')
@@ -33,7 +33,7 @@ graph TD
 @project_bp.route('/class/<int:class_id>/final-project')
 def final_project_dashboard(class_id):
     cls = Class.query.get_or_404(class_id)
-    if cls.teacher_id != current_user.id:
+    if cls.teacher_id != get_current_user().id:
         abort(403)
 
     topics = ProjectTopic.query.filter_by(class_id=class_id).order_by(ProjectTopic.id).all()
@@ -50,7 +50,7 @@ def final_project_dashboard(class_id):
 @login_required
 def create_final_project(class_id):
     cls = Class.query.get_or_404(class_id)
-    if cls.teacher_id != current_user.id:
+    if cls.teacher_id != get_current_user().id:
         abort(403)
 
     if request.method == 'POST':
@@ -79,7 +79,7 @@ def create_final_project(class_id):
 @login_required
 def edit_topic(topic_id):
     topic = ProjectTopic.query.get_or_404(topic_id)
-    if topic.class_.teacher_id != current_user.id:
+    if topic.class_.teacher_id != get_current_user().id:
         abort(403)
 
     if request.method == 'POST':
@@ -102,7 +102,7 @@ def edit_topic(topic_id):
 @login_required
 def final_project_dashboard(class_id):
     cls = Class.query.get_or_404(class_id)
-    if cls.teacher_id != current_user.id:
+    if cls.teacher_id != get_current_user().id:
         abort(403)
 
     topics = ProjectTopic.query.filter_by(class_id=class_id).order_by(ProjectTopic.id).all()
@@ -141,7 +141,7 @@ def final_project_dashboard(class_id):
 @login_required
 def select_topic(class_id):
     cls = Class.query.get_or_404(class_id)
-    if not any(e.id == class_id for e in current_user.enrollments):
+    if not any(e.id == class_id for e in get_current_user().enrollments):
         abort(403)
 
     topics = ProjectTopic.query.filter_by(class_id=class_id).order_by(ProjectTopic.id).all()
@@ -150,7 +150,7 @@ def select_topic(class_id):
         return redirect(url_for('main.student_dashboard'))
 
     selected = TopicSelection.query.filter_by(
-        student_id=current_user.id,
+        student_id=get_current_user().id,
         is_selected=True
     ).first()
 
@@ -164,7 +164,7 @@ def select_topic(class_id):
 
         # === 关键修复：先查是否已选 ===
         existing = TopicSelection.query.filter_by(
-            student_id=current_user.id,
+            student_id=get_current_user().id,
             topic_id=topic_id
         ).first()
 
@@ -173,7 +173,7 @@ def select_topic(class_id):
             if not existing.is_selected:
                 # 取消其他选择
                 TopicSelection.query.filter_by(
-                    student_id=current_user.id,
+                    student_id=get_current_user().id,
                     is_selected=True
                 ).update({'is_selected': False})
                 existing.is_selected = True
@@ -183,12 +183,12 @@ def select_topic(class_id):
         else:
             # 不存在 → 取消旧选择 + 新增
             TopicSelection.query.filter_by(
-                student_id=current_user.id,
+                student_id=get_current_user().id,
                 is_selected=True
             ).update({'is_selected': False})
 
             selection = TopicSelection(
-                student_id=current_user.id,
+                student_id=get_current_user().id,
                 topic_id=topic_id,
                 is_selected=True
             )
@@ -201,7 +201,7 @@ def select_topic(class_id):
     logger.info(
         f"cls {cls.name}, "
         f"topics={topics}"
-        f"Student ID {current_user.student_id} is selected? {selected}"
+        f"Student ID {get_current_user().student_id} is selected? {selected}"
     )
     return render_template(
         'final_project/select.html',
@@ -215,11 +215,11 @@ def select_topic(class_id):
 def submit_project1(class_id):
     cls = Class.query.get_or_404(class_id)
     
-    if not any(e.id == class_id for e in current_user.enrollments):
+    if not any(e.id == class_id for e in get_current_user().enrollments):
         abort(403)
 
     selection = TopicSelection.query.filter_by(
-        student_id=current_user.id,
+        student_id=get_current_user().id,
         is_selected=True
     ).join(ProjectTopic).filter(ProjectTopic.class_id == class_id).first()
 
@@ -232,14 +232,14 @@ def submit_project1(class_id):
     if request.method == 'POST':
         # 1. 取消旧的最新提交
         ProjectSubmission.query.filter_by(
-            student_id=current_user.id,
+            student_id=get_current_user().id,
             topic_id=topic.id,
             is_latest=True
         ).update({'is_latest': False})
 
         # 2. 创建新提交
         submission = ProjectSubmission(
-            student_id=current_user.id,
+            student_id=get_current_user().id,
             topic_id=topic.id,
             is_latest=True
         )
@@ -247,7 +247,7 @@ def submit_project1(class_id):
         # 文件上传
         if 'file' in request.files and request.files['file'].filename:
             file = request.files['file']
-            filename = secure_filename(f"{current_user.id}_{int(datetime.utcnow().timestamp())}_{file.filename}")
+            filename = secure_filename(f"{get_current_user().id}_{int(datetime.utcnow().timestamp())}_{file.filename}")
             upload_dir = os.path.join('uploads', 'final_projects', str(class_id))
             os.makedirs(upload_dir, exist_ok=True)
             filepath = os.path.join(upload_dir, filename)
@@ -262,7 +262,7 @@ def submit_project1(class_id):
         flash('提交成功！', 'success')
 
     latest = ProjectSubmission.query.filter_by(
-        student_id=current_user.id,
+        student_id=get_current_user().id,
         topic_id=topic.id,
         is_latest=True
     ).first()
@@ -285,11 +285,11 @@ import mimetypes
 def submit_project(class_id):
     cls = Class.query.get_or_404(class_id)
     
-    if not any(e.id == class_id for e in current_user.enrollments):
+    if not any(e.id == class_id for e in get_current_user().enrollments):
         abort(403)
 
     selection = TopicSelection.query.filter_by(
-        student_id=current_user.id,
+        student_id=get_current_user().id,
         is_selected=True
     ).join(ProjectTopic).filter(ProjectTopic.class_id == class_id).first()
 
@@ -302,14 +302,14 @@ def submit_project(class_id):
     if request.method == 'POST':
         # 1. 取消旧的最新提交
         ProjectSubmission.query.filter_by(
-            student_id=current_user.id,
+            student_id=get_current_user().id,
             topic_id=topic.id,
             is_latest=True
         ).update({'is_latest': False})
 
         # 2. 创建新提交
         submission = ProjectSubmission(
-            student_id=current_user.id,
+            student_id=get_current_user().id,
             topic_id=topic.id,
             is_latest=True
         )
@@ -332,7 +332,7 @@ def submit_project(class_id):
                 # 步骤 3：安全文件名
                 original_name = file.filename
                 timestamp = int(datetime.utcnow().timestamp())
-                safe_name = secure_filename(f"{current_user.id}_{timestamp}_{original_name}")
+                safe_name = secure_filename(f"{get_current_user().id}_{timestamp}_{original_name}")
                 
                 # 强制 .md 后缀
                 if not safe_name.lower().endswith('.md'):
@@ -352,7 +352,7 @@ def submit_project(class_id):
         flash('提交成功！', 'success')
 
     latest = ProjectSubmission.query.filter_by(
-        student_id=current_user.id,
+        student_id=get_current_user().id,
         topic_id=topic.id,
         is_latest=True
     ).first()
@@ -369,7 +369,7 @@ def submit_project(class_id):
 @project_bp.route('/api/grade_final_project', methods=['POST'])
 @login_required
 def api_grade_final_project():
-    if current_user.role != 'teacher':
+    if get_current_user().role != 'teacher':
         return jsonify({'error': 'Forbidden'}), 403
     data = request.get_json()
     from app.tasks import grade_submission  # ← 复用你的任务！
@@ -381,7 +381,7 @@ def api_grade_final_project():
 @project_bp.route('/grade', methods=['POST'])
 @login_required
 def api_grade_project_submission():
-    if current_user.role != 'teacher':
+    if get_current_user().role != 'teacher':
         return jsonify({'error': '仅教师可批改'}), 403
 
     data = request.get_json()
@@ -389,7 +389,7 @@ def api_grade_project_submission():
     submission = ProjectSubmission.query.get_or_404(submission_id)
 
     # 确保是本班项目
-    if submission.project.class_.teacher_id != current_user.id:
+    if submission.project.class_.teacher_id != get_current_user().id:
         return jsonify({'error': '无权限'}), 403
 
     # 触发你的现有任务！
@@ -406,7 +406,7 @@ def api_grade_project_submission():
 @login_required
 def view_submissions(topic_id):
     topic = ProjectTopic.query.get_or_404(topic_id)
-    if topic.class_.teacher_id != current_user.id:
+    if topic.class_.teacher_id != get_current_user().id:
         abort(403)
 
     submissions = ProjectSubmission.query.filter_by(topic_id=topic_id).all()
@@ -421,7 +421,7 @@ def view_submissions(topic_id):
 @login_required
 def grade_project_submission(submission_id):
     submission = ProjectSubmission.query.get_or_404(submission_id)
-    if submission.topic.class_.teacher_id != current_user.id:
+    if submission.topic.class_.teacher_id != get_current_user().id:
         abort(403)
 
     from app.tasks import grade_submission

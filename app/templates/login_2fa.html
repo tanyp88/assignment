@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}输入验证码 - SwiftCheck{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-4">
+            <div class="card shadow">
+                <div class="card-body text-center p-5">
+                    <h2>邮箱验证码</h2>
+                    <p class="text-muted mb-4">
+                        已发送 6 位验证码到<br>
+                        <strong>{{ email }}</strong>
+                    </p>
+                    <form method="POST">
+                        {{ form.hidden_tag() }}
+                        <!-- 关键！直接从 session 读取真实指纹，永不丢失！ -->
+                        <input type="hidden" 
+                            name="device_fingerprint" 
+                            id="device_fingerprint" 
+                            value="{{ session.get('pending_fingerprint', '') }}">
+                        <!-- 自动注入设备信息（完全不需要前端再生成） -->
+                        <input type="hidden" 
+                            name="client_device_info" 
+                            value="{{ session.get('client_device_info', {}) | tojson | safe }}">
+                        <!-- 如果 session 里没有，才 fallback 生成 -->
+
+                        <input type="text" name="code" maxlength="6" 
+                               class="form-control form-control-lg text-center mb-3"
+                               placeholder="输入验证码" required autofocus>
+                        <button type="submit" class="btn btn-primary btn-lg w-100">
+                            验证并登录
+                        </button>
+                    </form>
+                    <div class="mt-3">
+                        <small>
+                            没收到？检查垃圾邮件 或 
+                            <a href="{{ url_for('main.cancel_2fa') }}">重新登录</a>
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- login_2fa.html 底部加上这坨 -->
+<script>
+// 终极防崩溃指纹生成函数（能活到世界末日）
+async function generateAndFillFingerprint() {
+    // 1. 防御性检查：元素是否存在
+    const fpInput = document.getElementById('device_fingerprint');
+    if (!fpInput) {
+        console.warn('device_fingerprint 元素不存在，指纹绑定失败');
+        return;
+    }
+
+    // 2. 如果已经有了，就不生成（防重复）
+    if (fpInput.value && fpInput.value.length > 32) {
+        console.log('指纹已存在:', fpInput.value.substring(0,16) + '...');
+        return;
+    }
+
+    // 3. 即使 Canvas/Audio 全被禁，也要给个 fallback
+    let finalFp = 'fallback-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+
+    try {
+        // 尝试生成真实指纹（你原来的 generateFingerprint 函数）
+        if (typeof generateFingerprint === 'function') {
+            await generateFingerprint();
+            const realFp = document.getElementById('fingerprint')?.value;
+            if (realFp && realFp.length > 32) {
+                finalFp = realFp;
+            }
+        }
+    } catch (e) {
+        console.warn('真实指纹生成失败，使用 fallback', e);
+    }
+
+    // 4. 最终写入（永不崩溃）
+    fpInput.value = finalFp;
+    console.log('2FA指纹已成功写入（即使在监狱浏览器中）:', finalFp.substring(0,16) + '...');
+}
+
+// 5. 三重保险执行（总有一个能活）
+window.addEventListener('load', () => {
+    setTimeout(generateAndFillFingerprint, 600);
+});
+
+window.addEventListener('DOMContentLoaded', () => {
+    setTimeout(generateAndFillFingerprint, 300);
+});
+
+// 最后一道保险：用户点提交前再强制写一次
+document.querySelector('form')?.addEventListener('submit', (e) => {
+    generateAndFillFingerprint();
+});
+</script>
+{% endblock %}

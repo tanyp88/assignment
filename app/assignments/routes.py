@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, current_app, abort, send_from_directory
-from flask_login import login_required, current_user
+#from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
-from app import db, logger  # ← ADD THIS
+from app import db, logger, login_required, get_current_user  # ← ADD THIS
 from app.models import Assignment, Submission, User, Class, enrolled_classes
 import logging
 import logging
@@ -33,10 +33,10 @@ assignments = Blueprint('assignments', __name__, url_prefix='/zuoye')
 # --- Helper Functions ---
 
 def is_teacher():
-    return current_user.is_authenticated and current_user.role == 'teacher'
+    return get_current_user().is_authenticated and get_current_user().role == 'teacher'
 
 def is_student():
-    return current_user.is_authenticated and current_user.role == 'student'
+    return get_current_user().is_authenticated and get_current_user().role == 'student'
 
 UPLOADS_DIR='/app/uploads'
 # Create a custom route that handles the full path after the endpoint
@@ -135,7 +135,7 @@ def validate_and_process_file(file, assignment_id):
     os.makedirs(upload_dir, exist_ok=True)
 
     timestamp = int(datetime.utcnow().timestamp())
-    safe_name = f"{current_user.id}_{assignment_id}_{timestamp}_{filename}"
+    safe_name = f"{get_current_user().id}_{assignment_id}_{timestamp}_{filename}"
     final_path = os.path.join(upload_dir, safe_name)
 
     # === 6. 保存原始文件 ===
@@ -182,7 +182,7 @@ def manage_assignments():
     teacher_assignments = db.session.scalars(
         select(Assignment)
         .join(Class)
-        .where(Class.teacher_id == current_user.id)
+        .where(Class.teacher_id == get_current_user().id)
         .options(selectinload(Assignment.class_))
     ).all()
     return render_template('assignments/manage.html', title='Manage Assignments', assignments=teacher_assignments)
@@ -195,7 +195,7 @@ def create_assignment(class_id):
         return redirect(url_for('main.student_dashboard'))
 
     class_obj = db.session.get(Class, class_id)
-    if not class_obj or class_obj.teacher_id != current_user.id:
+    if not class_obj or class_obj.teacher_id != get_current_user().id:
         flash('Class not found or you are not authorized.', 'danger')
         return redirect(url_for('main.student_dashboard'))
 
@@ -241,7 +241,7 @@ def edit_assignment(assignment_id):
         return redirect(url_for('main.student_dashboard'))
 
     assignment = db.session.get(Assignment, assignment_id)
-    if not assignment or assignment.class_.teacher_id != current_user.id:
+    if not assignment or assignment.class_.teacher_id != get_current_user().id:
         flash('Assignment not found or you are not authorized.', 'danger')
         return redirect(url_for('main.student_dashboard'))
 
@@ -288,7 +288,7 @@ def submit_assignment1(assignment_id):
         return redirect(url_for('main.student_dashboard'))
     
     # Check if student is enrolled in the class
-    if assignment.class_ not in current_user.enrolled_classes:
+    if assignment.class_ not in get_current_user().enrolled_classes:
         flash('You are not enrolled in this class.', 'danger')
         return redirect(url_for('main.student_dashboard'))
     
@@ -296,13 +296,13 @@ def submit_assignment1(assignment_id):
     existing_submission = db.session.scalar(
         db.select(Submission)
         .where(Submission.assignment_id == assignment_id)
-        .where(Submission.student_id == current_user.id)
+        .where(Submission.student_id == get_current_user().id)
     )
     if existing_submission and existing_submission.grade is not None:
         flash('You have already submitted this assignment.', 'info')
         return redirect(url_for('assignments.view_submission', 
                               assignment_id=assignment_id, 
-                              student_id=current_user.id))
+                              student_id=get_current_user().id))
     
     if request.method == 'POST':
         content = request.form.get('content', '').strip()
@@ -332,7 +332,7 @@ def submit_assignment1(assignment_id):
             # === CREATE NEW SUBMISSION ===
             submission = Submission(
                 assignment_id=assignment_id,
-                student_id=current_user.id,
+                student_id=get_current_user().id,
                 content=content or '',
                 file_path=file_path
             )
@@ -353,7 +353,7 @@ def submit_assignment1(assignment_id):
         
         return redirect(url_for('assignments.view_submission', 
                                 assignment_id=assignment_id, 
-                                student_id=current_user.id))
+                                student_id=get_current_user().id))
     
     # --- GET Handling ---
     # If the student has an ungraded submission, pass it to the template for editing
@@ -374,7 +374,7 @@ def view_submissions_history():
     
     submissions = db.session.scalars(
         db.select(Submission)
-        .where(Submission.student_id == current_user.id)
+        .where(Submission.student_id == get_current_user().id)
         .order_by(Submission.submitted_at.desc())
     ).all()
     
@@ -392,13 +392,13 @@ def view_submission(assignment_id, student_id):
     if not submission:
         flash('Submission not found.', 'danger')
         return redirect(url_for('main.student_dashboard'))
-    if is_student() and submission.student_id != current_user.id:
+    if is_student() and submission.student_id != get_current_user().id:
         flash('You are not authorized to view this submission.', 'danger')
         return redirect(url_for('main.student_dashboard'))
     if is_teacher() and not db.session.execute(
         select(Class).join(Assignment).where(
             Assignment.id == assignment_id,
-            Class.teacher_id == current_user.id
+            Class.teacher_id == get_current_user().id
         )
     ).scalar_one_or_none():
         flash('You are not authorized to view this submission.', 'danger')
@@ -425,7 +425,7 @@ def view_submissions(assignment_id):
     if not db.session.execute(
         select(Class).where(
             Class.id == assignment.class_id,
-            Class.teacher_id == current_user.id
+            Class.teacher_id == get_current_user().id
         )
     ).scalar_one_or_none():
         flash('You are not authorized to view submissions for this assignment.', 'danger')
@@ -447,7 +447,7 @@ def view_submissions(assignment_id):
 @assignments.route('/submission/<int:assignment_id>/grade', methods=['POST'])
 @login_required
 def grade_submission_route(assignment_id):
-    logger.info(f"grade_submission_route called by user={getattr(current_user, 'id', None)} assignment={assignment_id}")
+    logger.info(f"grade_submission_route called by user={getattr(get_current_user(), 'id', None)} assignment={assignment_id}")
     if not is_teacher():
         flash('Only teachers can grade submissions.', 'danger')
         return redirect(url_for('main.student_dashboard'))
@@ -462,7 +462,7 @@ def grade_submission_route(assignment_id):
 
     logger.debug(
         "grade_submission_route called – "
-        f"teacher={current_user.id} assignment={assignment_id} "
+        f"teacher={get_current_user().id} assignment={assignment_id} "
         f"student={student_id} action={action!r} grade_input={grade_input!r}"
     )
 
@@ -518,10 +518,10 @@ def grade_submission_route(assignment_id):
         db.session.commit()
         if final_grade is None:
             flash(f'Submission for student {student_id} has been UNGRADED.', 'info')
-            logger.info(f"Teacher {current_user.id} UNGRADED submission {submission.id}")
+            logger.info(f"Teacher {get_current_user().id} UNGRADED submission {submission.id}")
         else:
             flash(f'Submission graded: {final_grade}/100', 'success')
-            logger.info(f"Teacher {current_user.id} graded submission {submission.id} → {final_grade}")
+            logger.info(f"Teacher {get_current_user().id} graded submission {submission.id} → {final_grade}")
     except Exception as e:
         db.session.rollback()
         flash('Database error. Grade not saved.', 'danger')
@@ -547,7 +547,7 @@ def grade_assignment(assignment_id, student_id):
         return redirect(url_for('assignments.manage_assignments'))
     
     # Ensure teacher is enrolled in the class
-    if submission.assignment.class_ not in current_user.enrolled_classes:
+    if submission.assignment.class_ not in get_current_user().enrolled_classes:
         flash('You are not authorized to grade this submission.', 'danger')
         return redirect(url_for('assignments.manage_assignments'))
     
@@ -584,16 +584,16 @@ def class_detail(class_id):
     if not class_obj:
         flash('Class not found.', 'danger')
         return redirect(url_for('main.student_dashboard'))
-    if is_teacher() and class_obj.teacher_id != current_user.id:
+    if is_teacher() and class_obj.teacher_id != get_current_user().id:
         flash('You are not authorized to view this class.', 'danger')
         return redirect(url_for('main.student_dashboard'))
     else:
-        print(f"Current user ID: {current_user.id}, Role: {current_user.role}")  # Debug
+        print(f"Current user ID: {get_current_user().id}, Role: {get_current_user().role}")  # Debug
         submissions = {}
-        if current_user.is_authenticated and current_user.role == 'student':
+        if get_current_user().is_authenticated and get_current_user().role == 'student':
             submissions = {
                 s.assignment_id: s for s in Submission.query
-                .filter_by(student_id=current_user.id)
+                .filter_by(student_id=get_current_user().id)
                 .join(Assignment)
                 .filter(Assignment.class_id == class_id)
                 .all()
@@ -606,7 +606,7 @@ def class_detail(class_id):
 @login_required
 def autograde_assignment(assignment_id):
     """Autogrades all ungraded submissions for a given assignment."""
-    logger.info(f"autograde_assignment called by user={getattr(current_user, 'id', None)} assignment={assignment_id}")
+    logger.info(f"autograde_assignment called by user={getattr(get_current_user(), 'id', None)} assignment={assignment_id}")
 
     if not is_teacher():
         flash('Only teachers can autograde assignments.', 'danger')
@@ -622,7 +622,7 @@ def autograde_assignment(assignment_id):
     if not db.session.execute(
         select(Class).where(
             Class.id == assignment.class_id,
-            Class.teacher_id == current_user.id
+            Class.teacher_id == get_current_user().id
         )
     ).scalar_one_or_none():
         flash('You are not authorized to autograde this assignment.', 'danger')
@@ -674,7 +674,7 @@ def autograde_assignment(assignment_id):
     try:
         db.session.commit()
         flash(f'Successfully autograded {graded_count} submissions.', 'success')
-        logger.info(f"Teacher {current_user.id} successfully autograded {graded_count} submissions for assignment {assignment_id}.")
+        logger.info(f"Teacher {get_current_user().id} successfully autograded {graded_count} submissions for assignment {assignment_id}.")
     except Exception as e:
         db.session.rollback()
         flash('A database error occurred during batch grading. No grades were saved.', 'danger')
@@ -685,7 +685,7 @@ def autograde_assignment(assignment_id):
 @assignments.route('/grade_all_ungraded')
 @login_required
 def grade_all_ungraded():
-    if current_user.role != 'teacher':
+    if get_current_user().role != 'teacher':
         flash('Only teachers can grade.', 'danger')
         return redirect(url_for('main.manage_classes'))
 
@@ -699,7 +699,7 @@ def grade_all_ungraded():
             WHERE c.teacher_id = :teacher_id
               AND s.grade IS NULL
         """),
-        {"teacher_id": current_user.id}
+        {"teacher_id": get_current_user().id}
     ).fetchall()
 
     if not ungraded:
@@ -725,7 +725,7 @@ def assignment_detail(assignment_id):
         flash('Only teachers can view assignment submissions.', 'danger')
         return redirect(url_for('main.student_dashboard'))
     assignment = db.session.get(Assignment, assignment_id)
-    if not assignment or assignment.class_.teacher_id != current_user.id:
+    if not assignment or assignment.class_.teacher_id != get_current_user().id:
         flash('Assignment not found or you are not authorized.', 'danger')
         return redirect(url_for('main.student_dashboard'))
     submissions = assignment.submissions
@@ -740,7 +740,7 @@ def edit_class(class_id):
     """
     
     # 1. Role Check: Only teachers are authorized to edit classes
-    if current_user.role != 'teacher':
+    if get_current_user().role != 'teacher':
         flash('You are not authorized to manage classes.', 'danger')
         # Abort with a 403 Forbidden status
         abort(403) 
@@ -806,7 +806,7 @@ def submit_assignment():
             return redirect(url_for('assignments.submit_assignment'))
         enrolled = db.session.execute(
             select(Class).join(enrolled_classes).where(
-                enrolled_classes.c.user_id == current_user.id,
+                enrolled_classes.c.user_id == get_current_user().id,
                 enrolled_classes.c.class_id == class_id
             )
         ).scalar_one_or_none()
@@ -816,7 +816,7 @@ def submit_assignment():
         existing_submission = db.session.execute(
             select(Submission).where(
                 Submission.assignment_id == assignment_id,
-                Submission.student_id == current_user.id
+                Submission.student_id == get_current_user().id
             )
         ).scalar_one_or_none()
 
@@ -827,7 +827,7 @@ def submit_assignment():
             return redirect(url_for('assignments.class_detail', class_id=class_id))
         submission = Submission(
             assignment_id=assignment_id,
-            student_id=current_user.id,
+            student_id=get_current_user().id,
             content=content,
             submitted_at=datetime.now()
         )
@@ -835,7 +835,7 @@ def submit_assignment():
         db.session.commit()
         flash('Submission successful.', 'success')
         return redirect(url_for('assignments.class_detail', class_id=class_id))
-    user = db.session.get(User, current_user.id)
+    user = db.session.get(User, get_current_user().id)
     classes = user.enrolled_classes
     return render_template('assignments/submit.html',  classes=classes, title='Submit Assignment')
 
@@ -846,11 +846,11 @@ def get_assignments(class_id):
         return jsonify({'error': 'Unauthorized'}), 403
     enrolled = db.session.execute(
         select(Class).join(enrolled_classes).where(
-            enrolled_classes.c.user_id == current_user.id,
+            enrolled_classes.c.user_id == get_current_user().id,
             enrolled_classes.c.class_id == class_id
         )
     ).scalar_one_or_none()
-    logger.info(f"Enrolled check for user {current_user.id} in class {class_id}: {enrolled}")
+    logger.info(f"Enrolled check for user {get_current_user().id} in class {class_id}: {enrolled}")
     if not enrolled:
         return jsonify({'error': 'Not enrolled in this class'}), 403
     assignments = db.session.scalars(
@@ -872,7 +872,7 @@ def get_assignment_details(assignment_id):
         return jsonify({'error': 'Assignment not found'}), 404
     enrolled = db.session.execute(
         select(Class).join(enrolled_classes).where(
-            enrolled_classes.c.user_id == current_user.id,
+            enrolled_classes.c.user_id == get_current_user().id,
             enrolled_classes.c.class_id == assignment.class_id
         )
     ).scalar_one_or_none()
@@ -900,7 +900,7 @@ def assignment_report(class_id):
         return redirect(url_for('main.student_dashboard'))
 
     cls = db.session.get(Class, class_id)
-    if not cls or cls.teacher_id != current_user.id:
+    if not cls or cls.teacher_id != get_current_user().id:
         flash('Class not found or unauthorized.', 'danger')
         return redirect(url_for('main.teacher_dashboard'))
 
@@ -978,7 +978,7 @@ def assignment_report_csv(class_id):
         return redirect(url_for('main.student_dashboard'))
 
     cls = db.session.get(Class, class_id)
-    if not cls or cls.teacher_id != current_user.id:
+    if not cls or cls.teacher_id != get_current_user().id:
         flash('Unauthorized.', 'danger')
         return redirect(url_for('main.teacher_dashboard'))
 
@@ -1047,13 +1047,13 @@ def assignment_report_csv(class_id):
 @login_required
 def student_submissions(class_id, student_id):
     """Show all submissions of a student in a specific class."""
-    if current_user.role != 'teacher':
+    if get_current_user().role != 'teacher':
         flash('Only teachers can view student submissions.', 'danger')
         return redirect(url_for('main.teacher_dashboard'))
 
     # 1. Verify class exists and teacher owns it
     cls = Class.query.get_or_404(class_id)
-    if cls.teacher_id != current_user.id:
+    if cls.teacher_id != get_current_user().id:
         flash('You do not teach this class.', 'danger')
         return redirect(url_for('main.manage_classes'))
 
@@ -1106,11 +1106,11 @@ def download_file(submission_id):
     submission = Submission.query.get_or_404(submission_id)
 
     # Security: Teacher or student owner
-    if current_user.role == 'teacher':
-        if submission.assignment.class_.teacher_id != current_user.id:
+    if get_current_user().role == 'teacher':
+        if submission.assignment.class_.teacher_id != get_current_user().id:
             abort(403)
-    elif current_user.role == 'student':
-        if submission.student_id != current_user.id:
+    elif get_current_user().role == 'student':
+        if submission.student_id != get_current_user().id:
             abort(403)
     else:
         abort(403)

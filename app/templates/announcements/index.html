@@ -7,7 +7,7 @@
     <h3>Announcements</h3>
 
     <!-- CREATE BUTTON – TEACHER ONLY -->
-    {% if current_user.role == 'teacher' %}
+    {% if user.role == 'teacher' %}
     <div class="mb-3 text-end">
         <a href="{{ url_for('main.announcement_create') }}" class="btn btn-primary">
             <i class="fas fa-plus me-1"></i> Create Announcement
@@ -44,7 +44,7 @@
     {% endfor %}
 
     <!-- STUDENT: Send Message -->
-    {% if current_user.role == 'student' %}
+    {% if user.role == 'student' %}
     <div class="card border-primary mb-3">
         <div class="card-body">
             <form id="msg-form-{{ item.class.id }}" class="send-message-form">
@@ -64,7 +64,7 @@
     {% if messages %}
     <h4 class="mt-5">Private Messages</h4>
     {% for msg in messages %}
-    <div class="card mb-2 {% if current_user.role == 'teacher' %}border-info{% else %}border-success{% endif %}">
+    <div class="card mb-2 {% if user.role == 'teacher' %}border-info{% else %}border-success{% endif %}">
         <div class="card-body">
             <p class="mb-1">{{ msg.content }}</p>
             <small class="text-muted">

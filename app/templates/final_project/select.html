@@ -7,11 +7,33 @@
 
 <div classivateclass="row">
     {% for topic in topics %}
-    <div class="col-md-6 mb-3">
+    <div class="col mb-3">
         <div class="card h-100 {% if topic.is_full() %}border-danger{% else %}border-success{% endif %}">
             <div class="card-body d-flex flex-column">
                 <h5 class="card-title">{{ topic.topic_title }}</h5>
-                <p class="card-text flex-grow-1">{{ topic.rendered_description  }}</p>
+                
+                <div class="card-text flex-grow-1">
+                    
+                    <p class="mb-1">
+                        {{ topic.rendered_description|truncate(80) }}
+                    </p>
+
+                    <a 
+                        class="btn btn-sm btn-link p-0 mb-2" 
+                        data-bs-toggle="collapse" 
+                        href="#collapseText_{{ topic.id }}" 
+                        role="button" 
+                        aria-expanded="false" 
+                        aria-controls="collapseText_{{ topic.id }}"
+                    >
+                        查看完整描述...
+                    </a>
+
+                    <div class="collapse" id="collapseText_{{ topic.id }}">
+                        <p class="mt-2">{{ topic.rendered_description }}</p>
+                    </div>
+
+                </div>
                 <div class="mt-auto">
                     <p class="mb-2">
                         <strong>人数：</strong>
@@ -19,6 +41,8 @@
                             {{ topic.current_students() }} / {{ topic.max_students }}
                         </span>
                     </p>
+
+
                     {% if selected and selected.topic_id == topic.id %}
                         <span class="badge bg-success fs-6">已选择</span>
                         <a href="{{ url_for('final_project.submit_project', class_id=topic.class_id) }}" class="btn btn-primary btn-sm float-end">
@@ -39,6 +63,7 @@
                             </button>
                         </form>
                     {% endif %}
+
                 </div>
             </div>
         </div>

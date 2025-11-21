@@ -27,4 +27,6 @@ markdown==3.5.2  # for rendering Markdown content
 PyYAML==6.0.1    # for YAML front-matter
 
 python-magic 
+user-agents
+email_validator
 

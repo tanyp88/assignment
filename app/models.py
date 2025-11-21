@@ -4,6 +4,7 @@ from flask_login import UserMixin
 from datetime import datetime
 from markupsafe import Markup
 import markdown
+from werkzeug.security import generate_password_hash, check_password_hash
 
 class User(UserMixin, db.Model):
     __tablename__ = 'user'
@@ -13,6 +14,29 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(256), nullable=False)
     role = db.Column(db.String(10), default='student', nullable=False)
+
+    # === 反作弊神器字段 ===
+    login_token = db.Column(db.String(64), unique=True, index=True)  # 当前登录的唯一令牌
+    login_fingerprint = db.Column(db.Text)  # 设备指纹（浏览器特征）
+    login_ip = db.Column(db.String(45))
+    login_ua = db.Column(db.Text)  # User-Agent
+    login_at = db.Column(db.DateTime)  # 最后登录时间
+    force_logout = db.Column(db.Boolean, default=False)  # 强制踢下线标记
+    # === 结束 ===
+    
+    email_verified = db.Column(db.Boolean, default=False)  # 是否已验证邮箱
+    totp_secret = db.Column(db.String(32))  # 可选：支持 Google Authenticator
+
+    is_active = db.Column(db.Boolean, default=False)  # 必须验证邮箱后才为 True
+    email_verified_at = db.Column(db.DateTime, nullable=True)
+    email_verification_token = db.Column(db.String(100), unique=True, nullable=True)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)  # 加 index 更快！
+
+    # 新增 for reset password
+    reset_token = db.Column(db.String(100), unique=True, nullable=True)     # 临时重置令牌
+    reset_token_expires = db.Column(db.DateTime, nullable=True)            # 过期时间
+
     # manage_classes need lazy='select'
     enrolled_classes = db.relationship(
         'Class',
@@ -27,10 +51,38 @@ class User(UserMixin, db.Model):
     def enrollments(self):
         """兼容旧代码：enrollments → enrolled_classes"""
         return self.enrolled_classes
+
+    @property
+    def password(self):
+        raise AttributeError('password 是只写属性！')
+
+    @password.setter
+    def password(self, plaintext):
+        """自动 hash 明文密码"""
+        self.password_hash = generate_password_hash(plaintext)
+
+    def verify_password(self, plaintext):
+        return check_password_hash(self.password_hash, plaintext)
     # === 兼容结束 ===
     
     def __repr__(self):
         return f'<User {self.username}>'
+
+
+class Device(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    fingerprint = db.Column(db.String(64), nullable=False, unique=True)  # SHA256
+    platform = db.Column(db.String(32))      # "Windows", "Android", "iPhone", "Mac"
+    browser = db.Column(db.String(64))       # "Chrome/129", "Edge/129"
+    device_name = db.Column(db.String(64), default="未命名设备")  # 用户可改
+    is_mobile = db.Column(db.Boolean, default=False)
+    last_seen = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_active = db.Column(db.Boolean, default=True)  # 是否被踢
+
+
+
 
 class Class(db.Model):
     __tablename__ = 'classes'
@@ -101,6 +153,9 @@ class Attendance(db.Model):
     latitude = db.Column(db.Float, nullable=True)  
     longitude = db.Column(db.Float, nullable=True) 
     
+    # 核弹级字段
+    fingerprint  = db.Column(db.String(64), nullable=True, index=True)  # SHA-256 前64位或完整
+
     # Ensure a student can only check in once per class per session
     __table_args__ = (db.UniqueConstraint('class_id', 'student_id', 'checkin_time', name='uix_class_student_time'),)
 

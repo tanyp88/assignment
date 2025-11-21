@@ -18,7 +18,7 @@
                 {% endif %}
                 <strong>Grade:</strong> {{ submission.grade or 'Not graded' }}<br>
                 <strong>Feedback:</strong> {{ submission.feedback or 'No feedback provided.' }}
-                {% if current_user.role == 'teacher' %}
+                {% if user.role == 'teacher' %}
                     <a href="{{ url_for('assignments.view_submissions', assignment_id=assignment.id) }}" class="btn btn-sm btn-warning">Grade</a>
                 {% endif %}
             </li>

@@ -1,10 +1,10 @@
 # app/api/blog.py
 from flask import Blueprint, jsonify, request
-from flask_login import login_required, current_user
+#from flask_login import login_required, current_user
 from datetime import datetime
 from app.models import Announcement, Message, User, Class
 import os
-from app import db, logger
+from app import db, logger, login_required, get_current_user, is_logged_in
 from flask_wtf.csrf import generate_csrf
 
 api = Blueprint('api', __name__)
@@ -40,11 +40,11 @@ def api_announcements(class_id):
 def handle_messages(class_id):
     # 验证班级存在 + 用户有权限
     cls = Class.query.get_or_404(class_id)
-    if current_user.role == 'teacher':
-        if cls.teacher_id != current_user.id:
+    if get_current_user().role == 'teacher':
+        if cls.teacher_id != get_current_user().id:
             return jsonify({'error': '无权限'}), 403
-    elif current_user.role == 'student':
-        if cls not in current_user.enrolled_classes:
+    elif get_current_user().role == 'student':
+        if cls not in get_current_user().enrolled_classes:
             return jsonify({'error': '未报名此课'}), 403
     else:
         return jsonify({'error': '角色错误'}), 403
@@ -58,7 +58,7 @@ def handle_messages(class_id):
         # 创建私信
         msg = Message(
             content=content,
-            sender_id=current_user.id,
+            sender_id=get_current_user().id,
             class_id=class_id,
             created_at=datetime.utcnow()
         )
@@ -70,16 +70,16 @@ def handle_messages(class_id):
             'message': '发送成功',
             'data': {
                 'content': msg.content,
-                'sender': current_user.username,
-                'student_id': current_user.student_id,
+                'sender': get_current_user().username,
+                'student_id': get_current_user().student_id,
                 'time': msg.created_at.strftime("%m-%d %H:%M")
             }
         })
 
     else:  # GET
         msgs = Message.query.filter_by(class_id=class_id)
-        if current_user.role == 'student':
-            msgs = msgs.filter_by(sender_id=current_user.id)
+        if get_current_user().role == 'student':
+            msgs = msgs.filter_by(sender_id=get_current_user().id)
         msgs = msgs.order_by(Message.created_at.desc()).limit(50).all()
 
         return jsonify([{
@@ -87,20 +87,20 @@ def handle_messages(class_id):
             'sender': m.sender.username,
             'student_id': m.sender.student_id,
             'time': m.created_at.strftime("%m-%d %H:%M"),
-            'is_me': m.sender_id == current_user.id
+            'is_me': m.sender_id == get_current_user().id
         } for m in msgs])
 
 
-@api.route('/current_user')
+@api.route('/get_current_user()')
 def current_user_api():
-    if not current_user.is_authenticated:
+    if not is_logged_in():
         return jsonify({'authenticated': False})
     return jsonify({
         'authenticated': True,
-        'role': current_user.role,
-        'username': current_user.username,
-        'student_id': current_user.student_id,
-        'is_teacher': current_user.role == 'teacher'
+        'role': get_current_user().role,
+        'username': get_current_user().username,
+        'student_id': get_current_user().student_id,
+        'is_teacher': get_current_user().role == 'teacher'
     })
 
 @api.route('/presentations/<int:class_id>')

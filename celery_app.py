@@ -1,7 +1,7 @@
 #celery_app.py
-from app import create_app, celery
+from app import celery,create_app
 import logging
-
+import app.tasks
 # Set up logging for the worker/beat processes
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -15,3 +15,5 @@ flask_app = create_app()
 # We expose the fully configured 'celery' instance as 'celery_app'.
 # This is the object that Celery Beat and Worker must target.
 celery_app = celery
+
+

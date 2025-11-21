@@ -3,11 +3,11 @@ from flask import (
     Blueprint, render_template, request, jsonify, url_for, redirect, flash,
     send_file, make_response, current_app
 )
-from flask_login import login_required, current_user
+#from flask_login import login_required, current_user
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import text
 from sqlalchemy.orm import selectinload
-from app import db, logger, get_redis_client, csrf
+from app import db, logger, get_redis_client, csrf, login_required, get_current_user
 from app.models import Class, Attendance, User, enrolled_classes
 from app.push import send_push  # Your existing push system
 from datetime import datetime
@@ -21,10 +21,10 @@ def get_redis():
 # --- Helper Functions ---
 
 def is_teacher():
-    return current_user.is_authenticated and current_user.role == 'teacher'
+    return get_current_user().is_authenticated and get_current_user().role == 'teacher'
 
 def is_student():
-    return current_user.is_authenticated and current_user.role == 'student'
+    return get_current_user().is_authenticated and get_current_user().role == 'student'
     
 # --- Constants ---
 ATTENDANCE_KEY_PREFIX = 'attendance:token:'
@@ -40,16 +40,16 @@ attendance = Blueprint('attendance', __name__, template_folder='templates')
 @attendance.route('/generate/<int:class_id>')
 @login_required
 def generate_qr(class_id):
-    if current_user.role != 'teacher':
+    if get_current_user().role != 'teacher':
         return "Forbidden: Only teachers can generate QR codes", 403
 
     cls = Class.query.get_or_404(class_id)
-    if cls.teacher_id != current_user.id:
+    if cls.teacher_id != get_current_user().id:
         return "Forbidden: You do not teach this class", 403
 
     # Generate secure token
     token = str(uuid.uuid4())
-    payload = {'class_id': class_id, 'teacher_id': current_user.id}
+    payload = {'class_id': class_id, 'teacher_id': get_current_user().id}
     get_redis().setex(
         ATTENDANCE_KEY_PREFIX + token,
         TOKEN_EXPIRY_SECONDS,
@@ -88,8 +88,8 @@ def student_scan(class_id):
     #logger = current_app.logger
 
     # 1. Basic role check
-    if current_user.role != 'student':
-        logger.warning(f"Non-student {current_user.id} tried to access class {class_id} scan page.")
+    if get_current_user().role != 'student':
+        logger.warning(f"Non-student {get_current_user().id} tried to access class {class_id} scan page.")
         flash("Permission denied.", 'danger')
         return redirect(url_for('main.student_dashboard'))
 
@@ -116,13 +116,18 @@ def student_scan(class_id):
 @attendance.route('/checkin', methods=['POST'])
 @login_required
 def checkin():
-    if current_user.role != 'student':
+    if get_current_user().role != 'student':
         return jsonify(success=False, message="Only students can check in"), 403
     # ------------------------------------------------------------------
-    # 1. Student identity (never trust the payload)
+    # 0. Student identity (never trust the payload)
     # ------------------------------------------------------------------
-    student_id_str = current_user.student_id          # string ID from user table
-    student_pk     = current_user.id                  # integer PK
+    student_id_str = get_current_user().student_id          # string ID from user table
+    student_pk     = get_current_user().id                  # integer PK
+
+    # 1. 必须从登录态拿指纹（前端传的指纹一律不信！）
+    current_fingerprint = get_current_user().login_fingerprint  # 你之前存的 SHA-256 指纹
+    if not current_fingerprint:
+        return jsonify(success=False, message="Device not registered"), 403
 
     # ------------------------------------------------------------------
     # 2. JSON payload – token + location
@@ -196,7 +201,8 @@ def checkin():
         student_id=student_id_str,
         checkin_time=datetime.now(),
         latitude=lat,
-        longitude=lng
+        longitude=lng,
+        fingerprint=current_fingerprint  # 核弹级绑定
     )
     try:
         db.session.add(att)
@@ -220,11 +226,11 @@ def checkin():
 @login_required
 def get_attendance_status(class_id):
     
-    if current_user.role != 'teacher':
+    if get_current_user().role != 'teacher':
         return jsonify(success=False, message="Unauthorized"), 403
 
     cls = Class.query.get(class_id)
-    if not cls or cls.teacher_id != current_user.id:
+    if not cls or cls.teacher_id != get_current_user().id:
         return jsonify(success=False, message="Class not found or unauthorized"), 403
 
     today = datetime.now().date()
@@ -261,14 +267,14 @@ def get_attendance_status(class_id):
 @login_required
 def toggle_attendance(class_id):
     logger = current_app.logger
-    logger.debug(f"[TOGGLE] User {current_user.id} toggling class {class_id}")
+    logger.debug(f"[TOGGLE] User {get_current_user().id} toggling class {class_id}")
 
-    if current_user.role != 'teacher':
-        logger.warning(f"[TOGGLE] Forbidden: user {current_user.id} role {current_user.role}")
+    if get_current_user().role != 'teacher':
+        logger.warning(f"[TOGGLE] Forbidden: user {get_current_user().id} role {get_current_user().role}")
         return jsonify(success=False, message="Forbidden"), 403
 
     cls = Class.query.get(class_id)
-    if not cls or cls.teacher_id != current_user.id:
+    if not cls or cls.teacher_id != get_current_user().id:
         logger.warning(f"[TOGGLE] Unauthorized: class {class_id} owner {cls.teacher_id if cls else None}")
         return jsonify(success=False, message="Unauthorized"), 403
 
@@ -354,12 +360,12 @@ def toggle_attendance(class_id):
 @login_required
 def attendance_scan(class_id):
     """Same logic as the old wechat version – only the blueprint changed."""
-    if current_user.role != 'teacher':
+    if get_current_user().role != 'teacher':
         flash('只有老师可以签到', 'danger')
         return redirect(url_for('main.student_dashboard'))
 
     cls = Class.query.get_or_404(class_id)
-    if cls.teacher_id != current_user.id:
+    if cls.teacher_id != get_current_user().id:
         flash('无权管理该班级', 'danger')
         return redirect(url_for('main.student_dashboard'))
 
@@ -531,14 +537,14 @@ def student_checkin_landing():
     #  **No more WeChat OpenID simulation**
     #  Use the *currently logged-in* student (must be a student role)
     # --------------------------------------------------------------
-    if current_user.role != 'student':
+    if get_current_user().role != 'student':
         return render_template('attendance/checkin_result.html',
                                status='error',
                                message='签到失败: 仅限学生账号。')
 
     # Pass the *student id* (not openid) to the internal helper
     return record_attendance_internal(
-        student_id=current_user.id,
+        student_id=get_current_user().id,
         class_id=class_id,
         token=token
     )
@@ -547,12 +553,12 @@ def student_checkin_landing():
 @attendance.route('/attendance/<int:class_id>/list')
 @login_required
 def attendance_list(class_id):
-    if current_user.role != 'teacher':
+    if get_current_user().role != 'teacher':
         flash('只有老师可以查看签到名单', 'danger')
         return redirect(url_for('main.teacher_dashboard'))
 
     cls = Class.query.get_or_404(class_id)
-    if cls.teacher_id != current_user.id:
+    if cls.teacher_id != get_current_user().id:
         flash('无权管理该班级', 'danger')
         return redirect(url_for('main.teacher_dashboard'))
 
@@ -622,7 +628,7 @@ def attendance_report(class_id):
         return redirect(url_for('main.student_dashboard'))
 
     cls = db.session.get(Class, class_id)
-    if not cls or cls.teacher_id != current_user.id:
+    if not cls or cls.teacher_id != get_current_user().id:
         flash('Unauthorized.', 'danger')
         return redirect(url_for('main.teacher_dashboard'))
 
@@ -693,7 +699,7 @@ def attendance_report_csv(class_id):
         return redirect(url_for('main.student_dashboard'))
 
     cls = db.session.get(Class, class_id)
-    if not cls or cls.teacher_id != current_user.id:
+    if not cls or cls.teacher_id != get_current_user().id:
         return redirect(url_for('main.teacher_dashboard'))
 
     session_dates = db.session.execute(
@@ -783,7 +789,7 @@ def checkin_internal(token: str, latitude, longitude):
 
     att = Attendance(
         class_id=class_id,
-        student_id=current_user.student_id,
+        student_id=get_current_user().student_id,
         checkin_time=datetime.now(),
         latitude=latitude,
         longitude=longitude
@@ -828,12 +834,12 @@ def student_checkin_landing():
 @attendance.route('/checkin_status/<int:class_id>')
 @login_required
 def checkin_status(class_id):
-    if current_user.role != 'student':
+    if get_current_user().role != 'student':
         return jsonify(checked_in=False)
 
     today = datetime.now().date()
     exists = Attendance.query.filter(
-        Attendance.student_id == current_user.student_id,
+        Attendance.student_id == get_current_user().student_id,
         Attendance.class_id == class_id,
         db.func.date(Attendance.checkin_time) == today
     ).first()

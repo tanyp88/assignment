@@ -61,14 +61,14 @@
 
                         <a class="nav-link" href="/zuoye/blog/">Blog</a>
                     </li>
-                    {% if current_user.is_authenticated %}
+                    {% if is_logged_in() %}
                         <!-- Links for Authenticated Users -->
-                        {% if current_user.role == 'teacher' %}
+                        {% if user.role == 'teacher' %}
                             <li class="nav-item">
                                 <a class="nav-link" href="{{ url_for('main.manage_classes') }}">Manage Classes</a>
                             </li>
                         {% endif %}
-                        {#% if current_user.role == 'student' %}
+                        {#% if user.role == 'student' %}
                             <li class="nav-item">
                                 <a class="nav-link" href="{{ url_for('attendance.student_scan') }}">Scan Check-in</a>
                             </li>
@@ -78,10 +78,10 @@
 
                 <!-- Right-aligned items (Login/Profile/Logout) -->
                 <ul class="navbar-nav">
-                    {% if current_user.is_authenticated %}
+                    {% if is_logged_in() %}
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('main.profile') }}">
-                                <i class="fas fa-user-circle"></i> {{ current_user.username }}
+                                <i class="fas fa-user-circle"></i> {{ user.username }}
                             </a>
                         </li>
                         <li class="nav-item">

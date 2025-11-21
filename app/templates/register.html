@@ -1,12 +1,6 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Register</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body>
+{% extends "base.html" %}
+{% block title %}Login{% endblock %}
+{% block content %}
     <div class="container mt-5">
         <h2>Register</h2>
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -46,6 +40,12 @@
                 <input type="password" class="form-control" id="password" name="password" required>
                 <div class="invalid-feedback">Please enter a password.</div>
             </div>
+            <!-- 在原密码框下面加上这个 -->
+            <div class="mb-3">
+                <label for="password_confirm" class="form-label">Confirm Password</label>
+                <input type="password" class="form-control" id="password_confirm" name="password_confirm" required>
+                <div class="invalid-feedback">Passwords do not match.</div>
+            </div>
             <div class="mb-3">
                 <label for="role" class="form-label">Role</label>
                 <select class="form-select" id="role" name="role">
@@ -64,21 +64,34 @@
             <button type="submit" class="btn btn-primary">Register</button>
         </form>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        (function () {
-            'use strict'
-            var forms = document.querySelectorAll('.needs-validation')
-            Array.prototype.slice.call(forms).forEach(function (form) {
-                form.addEventListener('submit', function (event) {
-                    if (!form.checkValidity()) {
-                        event.preventDefault()
-                        event.stopPropagation()
-                    }
-                    form.classList.add('was-validated')
-                }, false)
-            })
-        })()
-    </script>
-</body>
-</html>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+
+(function () {
+    'use strict'
+    var forms = document.querySelectorAll('.needs-validation')
+    Array.prototype.slice.call(forms).forEach(function (form) {
+        form.addEventListener('submit', function (event) {
+            if (!form.checkValidity()) {
+                event.preventDefault()
+                event.stopPropagation()
+            }
+            form.classList.add('was-validated')
+        }, false)
+    })
+})()
+
+// 在你原来的脚本下面加上这个
+document.getElementById('password_confirm').addEventListener('input', function() {
+    const password = document.getElementById('password').value;
+    const confirm = this.value;
+    if (password !== confirm) {
+        this.setCustomValidity('两次密码不一致');
+    } else {
+        this.setCustomValidity('');
+    }
+});
+
+</script>
+{% endblock %}
